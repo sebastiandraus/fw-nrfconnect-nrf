@@ -210,7 +210,7 @@ static int zigbee_init(struct device *unused)
 #endif
 
 #if defined(CONFIG_ZIGBEE_ROLE_COORDINATOR)
-	zb_set_network_coordinator_role(channel_mask);
+	zb_set_network_router_role(channel_mask);
 #elif defined(CONFIG_ZIGBEE_ROLE_ROUTER)
 	zb_set_network_router_role(channel_mask);
 #elif defined(CONFIG_ZIGBEE_ROLE_END_DEVICE)

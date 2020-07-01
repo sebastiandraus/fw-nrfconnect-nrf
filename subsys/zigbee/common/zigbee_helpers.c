@@ -63,6 +63,10 @@ static bool           is_rejoin_procedure_started;
 static bool           is_rejoin_stop_requested;
 static bool           is_rejoin_in_progress;
 static u8_t           rejoin_attempt_cnt;
+// TODO: USE KConfig option, e.g. for CLI only?
+static bool           coordinatore_role_capable = true;
+static bool           can_change_role = false;
+static bool           change_to_coordinator_role = false;
 #if defined ZB_ED_ROLE
 static volatile bool  wait_for_user_input;
 static volatile bool  is_rejoin_start_scheduled;
@@ -72,6 +76,7 @@ static volatile bool  is_rejoin_start_scheduled;
 static void rejoin_the_network(zb_uint8_t param);
 static void start_network_rejoin(void);
 static void stop_network_rejoin(zb_uint8_t was_scheduled);
+static void start_network_formation(zb_uint8_t param);
 
 /**@brief Function to set the Erase persistent storage
  *        depending on the erase pin
@@ -190,6 +195,28 @@ addr_type_t parse_address(const char *input, zb_addr_u *addr,
 			     ADDR_INVALID;
 }
 
+/* Check if device should change its role. */
+static void zigbee_change_role_to_coordinator(void)
+{
+	zb_uint32_t channel_mask;
+	zb_bool_t comm_status;
+#if defined(CONFIG_ZIGBEE_CHANNEL_SELECTION_MODE_SINGLE)
+	channel_mask = (1UL << CONFIG_ZIGBEE_CHANNEL);
+#elif defined(CONFIG_ZIGBEE_CHANNEL_SELECTION_MODE_MULTI)
+	channel_mask =(CONFIG_ZIGBEE_CHANNEL_MASK);
+#else
+#error No channel mask defined
+#endif
+	zb_set_network_coordinator_role(channel_mask);
+	zb_set_default_ffd_descriptor_values(zb_get_network_role());
+
+	zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM(
+		zboss_start_no_autostart,
+		0,
+		ZB_TIME_ONE_SECOND);
+	ZB_ERROR_CHECK(zb_err_code);
+}
+
 zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 {
 	zb_zdo_app_signal_hdr_t *sig_hndler = NULL;
@@ -252,6 +279,7 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 		if (status == RET_OK) {
 			if (role != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
 				LOG_INF("Start network steering");
+				can_change_role = true;
 				start_network_rejoin();
 			} else {
 				LOG_INF("Start network formation");
@@ -275,6 +303,8 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 		 *            perform network steering for a node on a network,
 		 *            (see BDB specification section 8.2).
 		 */
+		can_change_role = false;
+
 		if (status == RET_OK) {
 			zb_ext_pan_id_t extended_pan_id;
 			char ieee_addr_buf[IEEE_ADDR_BUF_SIZE] = { 0 };
@@ -339,6 +369,7 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 			 * rejoin procedure.
 			 */
 			if (role != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
+				can_change_role = false;
 				stop_network_rejoin(ZB_FALSE);
 			}
 		} else {
@@ -419,8 +450,15 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 					zb_zdo_signal_leave_params_t);
 			LOG_INF("Network left (leave type: %d)",
 				leave_params->leave_type);
-			/* Start network rejoin procedure */
-			start_network_rejoin();
+
+			can_change_role = true;
+			/* Check if device should change its role. */
+			if (change_to_coordinator_role) {
+				zigbee_change_role_to_coordinator();
+			} else {
+				/* Start network rejoin procedure */
+				start_network_rejoin();
+			}
 		} else {
 			LOG_ERR("Unable to leave network (status: %d)", status);
 		}
@@ -667,6 +705,41 @@ static void start_network_steering(zb_uint8_t param)
 	ZVUNUSED(bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING));
 }
 
+/**@brief Start network formation and change role if needed and possible.
+ */
+static void start_network_formation(zb_uint8_t param)
+{
+	ZVUNUSED(param);
+	if (zb_get_network_role() == ZB_NWK_DEVICE_TYPE_COORDINATOR)
+	{
+		LOG_INF("Start network formation as Coordinator");
+		ZVUNUSED(bdb_start_top_level_commissioning(ZB_BDB_NETWORK_FORMATION));
+	} else {
+		if ((zb_get_network_role() == ZB_NWK_DEVICE_TYPE_ROUTER)
+			&& (coordinatore_role_capable)
+			&& (can_change_role)
+			&& (!is_rejoin_procedure_started)) {
+
+			LOG_INF("Reset and device role change scheduled");
+			change_to_coordinator_role = true;
+			zb_bdb_reset_via_local_action(0);
+		} else {
+			LOG_ERR("Can not change device role, prevent role change!");
+			/* Prevent role change by clearing coordinatore_role_capable */
+			coordinatore_role_capable = false;
+			can_change_role = false;
+			change_to_coordinator_role = false;
+
+			/* Schedule network steering so the device will join as a router only. */
+			zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM(
+				start_network_steering,
+				0,
+				ZB_TIME_ONE_SECOND);
+			ZB_ERROR_CHECK(zb_err_code);
+		}
+	}
+}
+
 /**@brief Process rejoin procedure. To be called in signal handler.
  */
 static void rejoin_the_network(zb_uint8_t param)
@@ -674,6 +747,14 @@ static void rejoin_the_network(zb_uint8_t param)
 	ZVUNUSED(param);
 
 	if (stack_initialised && is_rejoin_procedure_started) {
+		/* If we couldn't join in 4 retries,
+		* let's try network formation if is possible.
+		*/
+		if ((rejoin_attempt_cnt >= 4)
+			&& (coordinatore_role_capable)) {
+			stop_network_rejoin(ZB_FALSE);
+			change_to_coordinator_role = true;
+		}
 		if (is_rejoin_stop_requested) {
 			is_rejoin_procedure_started = false;
 			is_rejoin_stop_requested = false;
@@ -681,8 +762,18 @@ static void rejoin_the_network(zb_uint8_t param)
 #if defined ZB_ED_ROLE
 			LOG_INF("Network rejoin procedure stopped as %sscheduled.",
 				(wait_for_user_input) ? "" : "NOT ");
-#elif defined ZB_ROUTER_ROLE
+#else
 			LOG_INF("Network rejoin procedure stopped.");
+			/* Schedule network formation
+			 * and change role to coordinator.
+			 */
+			if (can_change_role) {
+				zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM(
+					start_network_formation,
+					0,
+					ZB_TIME_ONE_SECOND);
+				ZB_ERROR_CHECK(zb_err_code);
+			}
 #endif
 		} else if (!is_rejoin_in_progress) {
 			/* Calculate new timeout */
@@ -722,7 +813,7 @@ static void start_network_rejoin(void)
 {
 #if defined ZB_ED_ROLE
 	if (!ZB_JOINED() && stack_initialised && !wait_for_user_input) {
-#elif defined ZB_ROUTER_ROLE
+#else
 	if (!ZB_JOINED() && stack_initialised) {
 #endif
 		is_rejoin_in_progress = false;
@@ -776,7 +867,7 @@ static void stop_network_rejoin(zb_uint8_t was_scheduled)
 	 * joining on user_input_indication().
 	 */
 	wait_for_user_input = was_scheduled;
-#elif defined ZB_ROUTER_ROLE
+#else
 	ZVUNUSED(was_scheduled);
 #endif
 
@@ -791,8 +882,18 @@ static void stop_network_rejoin(zb_uint8_t was_scheduled)
 #if defined ZB_ED_ROLE
 			LOG_INF("Network rejoin procedure stopped as %sscheduled.",
 				(wait_for_user_input) ? "" : "not ");
-#elif defined ZB_ROUTER_ROLE
+#else
 			LOG_INF("Network rejoin procedure stopped.");
+			/* Schedule network formation
+			 * and change role to coordinator.
+			 */
+			if (can_change_role) {
+				zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM(
+					start_network_formation,
+					0,
+					ZB_TIME_ONE_SECOND);
+				ZB_ERROR_CHECK(zb_err_code);
+			}
 #endif
 		} else {
 			/* Request rejoin procedure stop */

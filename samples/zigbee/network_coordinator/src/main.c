@@ -117,6 +117,11 @@ void zboss_signal_handler(zb_bufid_t bufid)
 	zb_bool_t comm_status;
 	zb_time_t timeout_bi;
 
+	if (zb_get_network_role() == ZB_NWK_DEVICE_TYPE_ROUTER) {
+		ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
+		goto _handler_end;
+	}
+
 	switch (sig) {
 	case ZB_BDB_SIGNAL_DEVICE_REBOOT:
 		/* BDB initialization completed after device reboot,
@@ -140,11 +145,6 @@ void zboss_signal_handler(zb_bufid_t bufid)
 
 	case ZB_BDB_SIGNAL_STEERING:
 		if (status == RET_OK) {
-			if (ZIGBEE_PERMIT_LEGACY_DEVICES == ZB_TRUE) {
-				LOG_INF("Allow pre-Zigbee 3.0 devices to join the network");
-				zb_bdb_set_legacy_device_support(1);
-			}
-
 			/* Schedule an alarm to notify about the end
 			 * of steering period
 			 */
@@ -183,6 +183,7 @@ void zboss_signal_handler(zb_bufid_t bufid)
 		break;
 	}
 
+_handler_end:
 	/* Update network status LED */
 	if (ZB_JOINED() &&
 	    (ZB_SCHEDULE_GET_ALARM_TIME(steering_finished, ZB_ALARM_ANY_PARAM,
