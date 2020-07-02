@@ -1,25 +1,10 @@
 /*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
-#include "nrf_cli.h"
 #include "zboss_api.h"
 #include "zb_error_handler.h"
 #include "zb_version.h"
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
 
-
-#if defined(APP_USBD_ENABLED) && APP_USBD_ENABLED
-#include "sdk_config.h"
-#include "nrf_delay.h"
-#include "app_usbd.h"
-#define APP_USBD_RESET_DELAY_MS 1000
-#endif
-
-/**
- * @defgroup zb_cli_cmd Generic commands
- * @ingroup zb_cli
- *
- * @{
- */
 
 /**@brief Print CLI and ZBOSS version
  *
@@ -65,21 +50,6 @@ static void cmd_reset(nrf_cli_t const * p_cli, size_t argc, char **argv)
         nrf_cli_help_print(p_cli, NULL, 0);
         return;
     }
-
-#if defined(APP_USBD_ENABLED) && APP_USBD_ENABLED
-    // The following logic relies on APP_USBD_EVT_STOPPED being handled by
-    // calling app_usbd_disable() as done in usbd_user_ev_handler() in zigbee_cli.c
-    //
-    // We can't use app_usbd_event_queue_process() because it's not supported for
-    // CDC CLI and there is no API to check app_usbd state.
-    app_usbd_stop();
-
-    uint32_t delay = APP_USBD_RESET_DELAY_MS;
-    while (--delay || nrf_drv_usbd_is_started())
-    {
-        nrf_delay_ms(1);
-    }
-#endif
 
     NVIC_SystemReset();
 }
