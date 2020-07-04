@@ -1,12 +1,34 @@
-/*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
-#include "zboss_api.h"
-#include "zb_error_handler.h"
-#include "zb_version.h"
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <errno.h>
+#include <version.h>
+#include <shell/shell.h>
+
+#include <zboss_api.h>
+#include <zb_error_handler.h>
+#include <zb_version.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
 
+#define DEBUG_HELP \
+	"Returns state of debug mode.\n"
 
-/**@brief Print CLI and ZBOSS version
+#define DEBUG_ON_HELP \
+	"Turns on debug mode.\n"
+
+#define DEBUG_OFF_HELP \
+	"Turns off debug mode.\n"
+
+#define DEBUG_WARN_MSG \
+	"You are about to turn the debug mode on. This unblocks several\n" \
+	"additional commands in the CLI. They can render the device " \
+	"unstable.\nIt is implied that you know what you are doing."
+
+/**@brief Print CLI, ZBOSS and Zephyr kernel version
  *
  * @code
  * version
@@ -14,23 +36,20 @@
  *
  * @code
  * > version
- * CLI: Dec 11 2018 16:14:18
+ * CLI: Jul 2 2020 16:14:18
  * ZBOSS: 3.1.0.59
  * Done
  * @endcode
  */
-static void cmd_version(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_version(const struct shell *shell, size_t argc, char **argv)
 {
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
+	shell_print(shell, "CLI: " __DATE__ " " __TIME__);
+	shell_print(shell, "ZBOSS: %d.%d.0.%d", ZBOSS_MAJOR, ZBOSS_MINOR,
+		    ZBOSS_SDK_REVISION);
+	shell_print(shell, "Zephyr kernel version: %s", KERNEL_VERSION_STRING);
 
-    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "CLI: " __DATE__ " " __TIME__ "\r\n");
-    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "ZBOSS: %d.%d.0.%d \r\n",
-                    ZBOSS_MAJOR, ZBOSS_MINOR, ZBOSS_SDK_REVISION);
-    print_done(p_cli, ZB_FALSE);
+	print_done(shell, false);
+	return 0;
 }
 
 /**@brief Perform device reset using NVIC_SystemReset().
@@ -39,85 +58,79 @@ static void cmd_version(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * > reset
  * @endcode
  */
-static void cmd_reset(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_reset(const struct shell *shell, size_t argc, char **argv)
 {
-
-    UNUSED_PARAMETER(argc);
-    UNUSED_PARAMETER(argv);
-
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
-
-    NVIC_SystemReset();
+	NVIC_SystemReset();
+	return 0;
 }
 
-#ifdef ZIGBEE_CLI_DEBUG
-/**@brief Enable/Disable debug mode in the CLI
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
+/**@brief Get state of debug mode in the CLI
  *
  * @code
- * debug <on|off>
+ * debug
+ * @endcode
+ */
+static int cmd_debug(const struct shell *shell, size_t argc, char **argv)
+{
+	if (zb_cli_debug_get() == ZB_TRUE) {
+		shell_print(shell, "Debug mode is on.");
+	} else {
+		shell_print(shell, "Debug mode is off.");
+	}
+
+	print_done(shell, false);
+	return 0;
+}
+#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
+
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
+/**@brief Enable debug mode in the shell
+ *
+ * @code
+ * debug on
  * @endcode
  *
- * This command unblocks several additional commands in the CLI.
- * They can render the device unstable. It is implied that you know what you are doing.
+ * This command unblocks several additional commands in the shell.
+ * They can render the device unstable. It is implied that you know
+ * what you are doing.
  */
-static void cmd_debug(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_debug_on(const struct shell *shell, size_t argc, char **argv)
 {
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
+	shell_warn(shell, DEBUG_WARN_MSG);
+	zb_cli_debug_set(ZB_TRUE);
+	shell_print(shell, "Debug mode is on.");
 
-    if (argc == 1)
-    {
-        if (zb_cli_debug_get() == ZB_TRUE)
-        {
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Debug mode is on.");
-        }
-        else
-        {
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Debug mode is off.");
-        }
-
-        print_done(p_cli, ZB_TRUE);
-        return;
-    }
-
-    if (argc != 2)
-    {
-        print_error(p_cli, "Invalid number of arguments", ZB_FALSE);
-        return;
-    }
-
-    if (!strcmp(argv[1], "on"))
-    {
-        nrf_cli_fprintf(p_cli, NRF_CLI_WARNING, "You are about to turn the debug mode on. This unblocks several additional commands in the CLI.\n");
-        nrf_cli_fprintf(p_cli, NRF_CLI_WARNING, "They can render the device unstable. It is implied that you know what you are doing.\n");
-        zb_cli_debug_set(ZB_TRUE);
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Debug mode is on.");
-    }
-    else if (!strcmp(argv[1], "off"))
-    {
-        zb_cli_debug_set(ZB_FALSE);
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Debug mode is off.");
-    }
-    else
-    {
-        print_error(p_cli, "Unrecognized argument", ZB_FALSE);
-        return;
-    }
-    print_done(p_cli, ZB_TRUE);
+	print_done(shell, false);
+	return 0;
 }
-#endif /* ZIGBEE_CLI_DEBUG */
+#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
 
-NRF_CLI_CMD_REGISTER(version, NULL, "Firmware version", cmd_version);
-NRF_CLI_CMD_REGISTER(reset, NULL, "Reset", cmd_reset);
-#ifdef ZIGBEE_CLI_DEBUG
-NRF_CLI_CMD_REGISTER(debug, NULL, "Debug mode", cmd_debug);
-#endif
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
+/**@brief Disable debug mode in the CLI
+ *
+ * @code
+ * debug off
+ * @endcode
+ */
+static int cmd_debug_off(const struct shell *shell, size_t argc, char **argv)
+{
+	zb_cli_debug_set(ZB_FALSE);
+	shell_print(shell, "Debug mode is off.");
 
-/** @} */
+	print_done(shell, false);
+	return 0;
+}
+#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
+
+SHELL_CMD_REGISTER(version, NULL, "Prints firmware version", cmd_version);
+SHELL_CMD_REGISTER(reset, NULL, "Resets the board", cmd_reset);
+
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
+	SHELL_CMD(on, NULL, DEBUG_ON_HELP, cmd_debug_on),
+	SHELL_CMD(off, NULL, DEBUG_OFF_HELP, cmd_debug_off),
+	SHELL_SUBCMD_SET_END);
+
+SHELL_CMD_REGISTER(debug, &sub_debug, DEBUG_HELP, cmd_debug);
+#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */

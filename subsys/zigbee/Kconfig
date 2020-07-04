@@ -200,6 +200,20 @@ config ZIGBEE_UART_TX_BUF_LEN
 
 endif #ZIGBEE_HAVE_SERIAL
 
+menuconfig ZIGBEE_CLI_SHELL
+	bool "Enable Zigbee CLI Shell"
+	select SHELL
+	select SHELL_BACKEND_SERIAL
+	select SHELL_BACKEND_SERIAL_INTERRUPT_DRIVEN
+
+if ZIGBEE_CLI_SHELL
+
+config ZIGBEE_SHELL_DEBUG_CMD
+	bool "Enable debug shell commands"
+	default n
+
+endif #ZIGBEE_CLI_SHELL
+
 config RADIO_STATISTICS
 	bool "Collect radio statistics"
 	default n
