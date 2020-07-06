@@ -5,11 +5,6 @@
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
 
-/* Fixes to make Lint passable - radio driver headers are not linted */
-#ifndef RAAL_SOFTDEVICE
-#define RAAL_SOFTDEVICE 0
-#endif /* RAAL_SOFTDEVICE */
-
 #include "nrf_802154.h"
 #include "fem/nrf_fem_control_config.h"
 #include "mac_nrf52_transceiver.h"
