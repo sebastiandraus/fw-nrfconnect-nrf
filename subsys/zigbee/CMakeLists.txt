@@ -29,5 +29,7 @@ zephyr_library_sources_ifndef(CONFIG_ZIGBEE_HAVE_SERIAL osif/zb_nrf_logger.c)
 zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli.c)
 zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_utils.c)
 zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd.c)
+zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_attr.c)
+zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_zcl.c)
 
 zephyr_library_link_libraries(zboss)

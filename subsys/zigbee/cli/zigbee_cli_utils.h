@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Nordic Semiconductor ASA
+ * Copyright (c) 2020 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -51,11 +51,11 @@ static inline void print_error(const struct shell *shell, const char *p_message,
 {
 	if (p_message) {
 		shell_error(shell, prepend_newline ? "\nError: %s"
-				: "Error: %s", p_message);
+			     : "Error: %s", p_message);
 	} else {
-		shell_error(shell,
-			    prepend_newline ? "\nError: Unknown error occurred"
-				: "Error: Unknown error occurred");
+		shell_error(shell, prepend_newline ?
+			     "\nError: Unknown error occurred" :
+			      "Error: Unknown error occurred");
 	}
 }
 

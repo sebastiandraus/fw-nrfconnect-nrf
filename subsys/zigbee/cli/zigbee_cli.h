@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Nordic Semiconductor ASA
+ * Copyright (c) 2020 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -15,6 +15,10 @@
 /**@brief Function for returning the number of the endpoint used by the CLI.
  */
 zb_uint8_t zb_get_cli_endpoint(void);
+
+/**@brief Sets the number of the Endpoint used by the CLI.
+ */
+zb_void_t zb_set_cli_endpoint(zb_uint8_t ep);
 
 /**@brief Function for intercepting every frame coming to the endpoint.
  *
