@@ -201,7 +201,7 @@ static zb_void_t generic_cmd_send(zb_bufid_t bufid, zb_uint16_t cb_param)
     }
 }
 
-#ifdef ZIGBEE_CLI_DEBUG
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Construct the raw ZCL frame and send it.
  *
  * @param bufid     ZBOSS buffer to fill.
@@ -415,7 +415,7 @@ void cmd_zb_generic_cmd(nrf_cli_t const * p_cli, size_t argc, char **argv)
 }
 
 
-#ifdef ZIGBEE_CLI_DEBUG
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Send raw ZCL frame.
  *
  * @code
@@ -555,7 +555,7 @@ void cmd_zb_zcl_raw(nrf_cli_t const * p_cli, size_t argc, char **argv)
     error:
         invalidate_row(table_row);
 }
-#endif /* ZIGBEE_CLI_DEBUG */
+#endif /* CONFIG_ZIGBEE_SHELL_DEBUG_CMD */
 
 
 /**@brief The Handler to 'intercept' every frame coming to the endpoint

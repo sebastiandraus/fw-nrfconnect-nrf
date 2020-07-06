@@ -8,7 +8,7 @@
  */
 
 
-#ifdef ZIGBEE_CLI_DEBUG
+#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Suspend Zigbee scheduler processing
  *
  * @code
