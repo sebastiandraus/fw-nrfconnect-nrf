@@ -39,7 +39,7 @@
 	" <h:profile> <h:attr_id> <d:attr_type>")
 
 #define PING_HELP \
-	("Sends ping command over ZCL." \
+	("Sends ping command over ZCL.\n" \
 	" Usage: ping [--no-echo] [--aps-ack] <h:addr> <d:payload size>")
 /**@brief Command set array
  */
@@ -55,8 +55,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_subsbcribe,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_zcl,
 	SHELL_CMD(attr, &sub_attr, "read/write attribute", NULL),
-	SHELL_CMD(subscribe, &sub_subsbcribe, SUBSCRIBE_HELP, NULL),
 	SHELL_CMD_ARG(ping, NULL, PING_HELP, cmd_zb_ping, 3, 2),
+	SHELL_CMD(subscribe, &sub_subsbcribe, SUBSCRIBE_HELP, NULL),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(zcl, &sub_zcl, "zcl subsystem commands", NULL);
