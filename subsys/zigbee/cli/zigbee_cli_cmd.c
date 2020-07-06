@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <version.h>
+#include <string.h>
 #include <shell/shell.h>
 
 #include <zboss_api.h>
@@ -95,28 +96,16 @@ static int cmd_debug(const struct shell *shell, size_t argc, char **argv)
  * They can render the device unstable. It is implied that you know
  * what you are doing.
  */
-static int cmd_debug_on(const struct shell *shell, size_t argc, char **argv)
+static int cmd_debug_on_off(const struct shell *shell, size_t argc, char **argv)
 {
-	shell_warn(shell, DEBUG_WARN_MSG);
-	zb_cli_debug_set(ZB_TRUE);
-	shell_print(shell, "Debug mode is on.");
-
-	print_done(shell, false);
-	return 0;
-}
-#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
-
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
-/**@brief Disable debug mode in the CLI
- *
- * @code
- * debug off
- * @endcode
- */
-static int cmd_debug_off(const struct shell *shell, size_t argc, char **argv)
-{
-	zb_cli_debug_set(ZB_FALSE);
-	shell_print(shell, "Debug mode is off.");
+	if (strcmp(argv[0], "on") == 0) {
+		shell_warn(shell, DEBUG_WARN_MSG);
+		zb_cli_debug_set(ZB_TRUE);
+		shell_print(shell, "Debug mode is on.");
+	} else if (strcmp(argv[0], "off") == 0) {
+		zb_cli_debug_set(ZB_FALSE);
+		shell_print(shell, "Debug mode is off.");
+	}
 
 	print_done(shell, false);
 	return 0;
@@ -128,8 +117,8 @@ SHELL_CMD_REGISTER(reset, NULL, "Resets the board", cmd_reset);
 
 #ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
-	SHELL_CMD(on, NULL, DEBUG_ON_HELP, cmd_debug_on),
-	SHELL_CMD(off, NULL, DEBUG_OFF_HELP, cmd_debug_off),
+	SHELL_CMD(on, NULL, DEBUG_ON_HELP, cmd_debug_on_off),
+	SHELL_CMD(off, NULL, DEBUG_OFF_HELP, cmd_debug_on_off),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(debug, &sub_debug, DEBUG_HELP, cmd_debug);
