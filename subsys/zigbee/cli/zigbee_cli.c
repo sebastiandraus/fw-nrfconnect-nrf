@@ -14,9 +14,12 @@
 /* CLI Agent endpoint. */
 static zb_uint8_t cli_ep;
 
+#ifndef DEVELOPMENT_TODO
+#error "Do we need app timer here?"
 // TODO: VERiFY IF NEEDED
-// /* Counter timer. */
-// APP_TIMER_DEF(m_timer_0);
+/* Counter timer. */
+APP_TIMER_DEF(m_timer_0);
+#endif
 
 #ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /* Debug mode indicator. */

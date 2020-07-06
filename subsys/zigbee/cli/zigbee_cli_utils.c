@@ -15,7 +15,9 @@
 #include <zigbee_logger_eprxzcl.h>
 #include "zigbee_cli_utils.h"
 
-/* TODO: REMOVE
+#ifndef DEVELOPMENT_TODO
+#error "Endpoint handler to be done here"
+// TODO: REMOVE
 NRF_SECTION_DEF(zb_ep_handlers, zb_device_handler_t);
 #define ZB_EP_HANDLER_SECTION_ITEM_GET(i) NRF_SECTION_ITEM_GET(zb_ep_handlers, zb_device_handler_t, (i))
 #define ZB_EP_HANDLER_SECTION_ITEM_COUNT  NRF_SECTION_ITEM_COUNT(zb_ep_handlers, zb_device_handler_t)
@@ -24,9 +26,9 @@ zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid)
 {
     unsigned int idx;
 
-#if defined(DEBUG_NRF) && NRF_LOG_ENABLED
+// #if defined(DEBUG_NRF) && NRF_LOG_ENABLED
     UNUSED_RETURN_VALUE(zigbee_logger_eprxzcl_ep_handler(bufid));
-#endif
+// #endif
 
     for (idx = 0; idx < ZB_EP_HANDLER_SECTION_ITEM_COUNT; idx++)
     {
@@ -39,7 +41,8 @@ zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid)
 
     return ZB_FALSE;
 }
-*/ //TODO: REMOVE
+#endif
+//TODO: REMOVE
 
 int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 		    zb_uint8_t * p_attr)
