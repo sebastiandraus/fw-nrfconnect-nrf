@@ -22,15 +22,6 @@
 #error "Endpoint to be defined here"
 #define NRF_ZIGBEE_EP_HANDLER_REGISTER(desc, p_handler)           \
    NRF_SECTION_ITEM_REGISTER(zb_ep_handlers, zb_device_handler_t const CONCAT_2(zb_ep_, desc)) = p_handler;
-
-static inline void print_usage(const struct shell *shell,
-                               const char * p_command,
-                               const char * p_help_string)
-{
-    nrf_cli_help_print(p_cli, NULL, 0);
-    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
-    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", p_command, p_help_string);
-}
 */ //TODO: REMOVE
 #endif
 
