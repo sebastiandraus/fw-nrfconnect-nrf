@@ -41,6 +41,7 @@
 #define PING_HELP \
 	("Sends ping command over ZCL.\n" \
 	" Usage: ping [--no-echo] [--aps-ack] <h:addr> <d:payload size>")
+
 /**@brief Command set array
  */
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_attr,
