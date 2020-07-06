@@ -31,6 +31,8 @@ static zb_bool_t m_debug_mode = ZB_FALSE;
 static zb_bool_t m_suspended = ZB_FALSE;
 #endif
 
+LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
+
 /**@brief Returns the number of the Endpoint used by the CLI.
  */
 zb_uint8_t zb_get_cli_endpoint(void)
