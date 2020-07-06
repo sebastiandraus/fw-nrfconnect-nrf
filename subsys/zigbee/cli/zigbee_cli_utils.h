@@ -17,7 +17,9 @@
 /*@brief Macro which defines the Endpoint Handler section,
  *       which allows iterating over them.
  */
-/* TODO: REMOVE
+#ifndef DEVELOPMENT_TODO
+// TODO: REMOVE
+#error "Endpoint to be defined here"
 #define NRF_ZIGBEE_EP_HANDLER_REGISTER(desc, p_handler)           \
    NRF_SECTION_ITEM_REGISTER(zb_ep_handlers, zb_device_handler_t const CONCAT_2(zb_ep_, desc)) = p_handler;
 
@@ -30,6 +32,7 @@ static inline void print_usage(const struct shell *shell,
     nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", p_command, p_help_string);
 }
 */ //TODO: REMOVE
+#endif
 
 /**@brief Finish the command by dumping 'Done'.
  *

@@ -474,7 +474,7 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	uint8_t len = strlen(*(++argv));
+	u8_t len = strlen(*(++argv));
 	if (p_row->attr_type == ZB_ZCL_ATTR_TYPE_CHAR_STRING) {
 		p_row->attr_value[0] = len;
 		strncpy((zb_char_t*)(p_row->attr_value + 1), *argv,
@@ -503,4 +503,7 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 
 /**@brief Endpoint handlers
  */
-//NRF_ZIGBEE_EP_HANDLER_REGISTER(attr, cli_agent_ep_handler_attr);
+#ifndef DEVELOPMENT_TODO
+#error "Endpoint handler to be done here."
+NRF_ZIGBEE_EP_HANDLER_REGISTER(attr, cli_agent_ep_handler_attr);
+#endif
