@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Nordic Semiconductor ASA
+ * Copyright (c) 2020 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -53,14 +53,14 @@ int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 	}
 
 	switch (attr_type) {
-	/* Boolean */
+	/* Boolean. */
 	case ZB_ZCL_ATTR_TYPE_BOOL:
 		bytes_written = snprintf(p_str_buf, buf_len, "%s",
 					 *((zb_bool_t *)p_attr) ? "True"
-						: "False");
+					  : "False");
 		break;
 
-	/* 1 byte */
+	/* 1 byte. */
 	case ZB_ZCL_ATTR_TYPE_8BIT:
 	case ZB_ZCL_ATTR_TYPE_8BITMAP:
 	case ZB_ZCL_ATTR_TYPE_U8:
@@ -74,7 +74,7 @@ int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 					 *((zb_int8_t*)p_attr));
 		break;
 
-	/* 2 bytes */
+	/* 2 bytes. */
 	case ZB_ZCL_ATTR_TYPE_16BIT:
 	case ZB_ZCL_ATTR_TYPE_16BITMAP:
 	case ZB_ZCL_ATTR_TYPE_U16:
@@ -88,7 +88,7 @@ int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 					 *((zb_int16_t*)p_attr));
 		break;
 
-	/* 4 bytes */
+	/* 4 bytes. */
 	case ZB_ZCL_ATTR_TYPE_32BIT:
 	case ZB_ZCL_ATTR_TYPE_32BITMAP:
 	case ZB_ZCL_ATTR_TYPE_U32:
@@ -101,7 +101,7 @@ int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 					 *((zb_int32_t*)p_attr));
 		break;
 
-	/* String */
+	/* String. */
 	case ZB_ZCL_ATTR_TYPE_CHAR_STRING:
 		string_len = p_attr[0];
 		p_attr++;
@@ -118,11 +118,9 @@ int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 		break;
 
 	case ZB_ZCL_ATTR_TYPE_IEEE_ADDR:
-		/*lint -e661 -e662 -save */
 		bytes_written = to_hex_str(p_str_buf, buf_len,
 					   (const u8_t *)p_attr,
 					   sizeof(zb_64bit_addr_t), true);
-		/*lint -restore */
 		break;
 
 	default:

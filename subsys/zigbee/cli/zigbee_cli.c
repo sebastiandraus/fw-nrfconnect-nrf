@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Nordic Semiconductor ASA
+ * Copyright (c) 2020 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,9 +11,10 @@
 
 #include "zigbee_cli.h"
 
-/* CLI Agent endpoint */
+/* CLI Agent endpoint. */
 static zb_uint8_t cli_ep;
 
+// TODO: VERiFY IF NEEDED
 // /* Counter timer. */
 // APP_TIMER_DEF(m_timer_0);
 
@@ -32,6 +33,13 @@ static zb_bool_t m_suspended = ZB_FALSE;
 zb_uint8_t zb_get_cli_endpoint(void)
 {
 	return cli_ep;
+}
+
+/**@brief Sets the number of the Endpoint used by the CLI.
+ */
+zb_void_t zb_set_cli_endpoint(zb_uint8_t ep)
+{
+	cli_ep = ep;
 }
 
 #ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
