@@ -815,14 +815,6 @@ int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 	ping_request_t * p_row;
 	u8_t          i;
 
-#ifndef DEVELOPMENT_TODO
-#error "NRF CLI help printer"
-	if (nrf_cli_help_requested(p_cli) || (argc == 1)) {
-		print_usage(p_cli, argv[0],
-			    "[--no-echo] [--aps-ack] <h:addr> <d:payload size>");
-		return -ENOEXEC;
-	}
-#endif
 	p_row = zb_ping_acquire_request();
 	if (p_row == NULL) {
 		print_error(shell, "Request pool empty - wait a bit", ZB_FALSE);
