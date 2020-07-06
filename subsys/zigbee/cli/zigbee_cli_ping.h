@@ -25,8 +25,7 @@
 
 /**@brief  Ping event type. Informs what kind of acknowledgment was received.
  */
-typedef enum
-{
+typedef enum {
 	/* APS acknowledgement of PING request received. */
 	PING_EVT_ACK_RECEIVED,
 	/* PING reply received. */
@@ -65,8 +64,7 @@ typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_us,
  *        and the value of the underlying 1MHz timer. Both combined give us the
  *        reliable way of measuring the time passed.
  */
-typedef struct time_abs_s
-{
+typedef struct time_abs_s {
 	zb_time_t   time_zb;
 	zb_uint32_t time_tim;
 } time_abs_t;
@@ -77,8 +75,7 @@ typedef struct time_abs_s
  *          to determine if it is the answer.
  *          The key parameter is the sequence number.
  */
-struct ping_request_s
-{
+struct ping_request_s {
 	zb_bool_t             taken;
 	zb_addr_u             remote_addr;
 	zb_uint8_t            remote_addr_mode;
