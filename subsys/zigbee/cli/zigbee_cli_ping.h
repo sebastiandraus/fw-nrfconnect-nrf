@@ -1,10 +1,16 @@
-/*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef ZIGBEE_CLI_PIN_H__
 #define ZIGBEE_CLI_PIN_H__
 
-#include "nrf_cli.h"
-#include "zboss_api.h"
-#include "zboss_api_addons.h"
+#include <shell/shell.h>
+
+#include <zboss_api.h>
+#include <zboss_api_addons.h>
 
 #define PING_CUSTOM_CLUSTER           0xBEEF
 #define PING_MAX_LENGTH               79
@@ -21,13 +27,25 @@
  */
 typedef enum
 {
-    PING_EVT_ACK_RECEIVED,      /**< APS acknowledgement of PING request received. */
-    PING_EVT_ECHO_RECEIVED,     /**< PING reply received. */
-    PING_EVT_FRAME_TIMEOUT,     /**< PING reply or APS acknowledgment was not received within timeout time. */
-    PING_EVT_FRAME_SCHEDULED,   /**< PING request was successfully scheduled for sending by the stack. */
-    PING_EVT_FRAME_SENT,        /**< PING request was successfully sent. This event occurrs only if both APS ACK was not requested. */
-    PING_EVT_REQUEST_RECEIVED,  /**< PING received was received. This event is passed only to the callback registered via @p zb_ping_set_ping_indication_cb. */
-    PING_EVT_ERROR,             /**< An error occured during sending PING request. */
+	/* APS acknowledgement of PING request received. */
+	PING_EVT_ACK_RECEIVED,
+	/* PING reply received. */
+	PING_EVT_ECHO_RECEIVED,
+	/* PING reply or APS acknowledgment was not received
+	 * within timeout time.
+	 */
+	PING_EVT_FRAME_TIMEOUT,
+	/* PING request was successfully scheduled for sending by the stack. */
+	PING_EVT_FRAME_SCHEDULED,
+	/* PING request was successfully sent. This event occurrs only
+	 * if both APS ACK was not requested.
+	 */
+	PING_EVT_FRAME_SENT,
+	/* PING received was received. This event is passed only
+	 * to the callback registered via @p zb_ping_set_ping_indication_cb. */
+	PING_EVT_REQUEST_RECEIVED,
+	/* An error occured during sending PING request. */
+	PING_EVT_ERROR,
 } ping_time_evt_t;
 
 /**@brief Forward declaration of ping request context structure. */
@@ -36,10 +54,12 @@ typedef struct ping_request_s ping_request_t;
 /**@brief  Ping event callback definition.
  *
  * @param[in] evt_type  Type of received  ping acknowledgment
- * @param[in] delay_us  Time, in microseconds, between ping request and the event.
+ * @param[in] delay_us  Time, in microseconds, between ping request
+ *                      and the event.
  * @param[in] p_row     Pointer to the ping request structure.
  */
-typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_us, ping_request_t * p_request);
+typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_us,
+	      ping_request_t * p_request);
 
 /**@brief The structure holds the BI interval value of ZBOSS timer
  *        and the value of the underlying 1MHz timer. Both combined give us the
@@ -47,34 +67,35 @@ typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_us, ping_r
  */
 typedef struct time_abs_s
 {
-    zb_time_t   time_zb;
-    zb_uint32_t time_tim;
+	zb_time_t   time_zb;
+	zb_uint32_t time_tim;
 } time_abs_t;
 
 /**@brief The row of the table which holds the requests which were sent.
  *
- * @details We compare the incoming responses with the rows contents to determine
- *          if it is the answer.
+ * @details We compare the incoming responses with the rows contents
+ *          to determine if it is the answer.
  *          The key parameter is the sequence number.
  */
 struct ping_request_s
 {
-    zb_bool_t             taken;
-    zb_addr_u             remote_addr;
-    zb_uint8_t            remote_addr_mode;
-    zb_uint8_t            ping_seq;
-    zb_uint8_t            request_ack;
-    zb_uint8_t            request_echo;
-    zb_uint16_t           count;
-    zb_uint16_t           timeout_ms;
-    volatile time_abs_t   sent;
-    nrf_cli_t           * p_cli;
-    ping_time_cb_t        p_cb;
+	zb_bool_t             taken;
+	zb_addr_u             remote_addr;
+	zb_uint8_t            remote_addr_mode;
+	zb_uint8_t            ping_seq;
+	zb_uint8_t            request_ack;
+	zb_uint8_t            request_echo;
+	zb_uint16_t           count;
+	zb_uint16_t           timeout_ms;
+	volatile time_abs_t   sent;
+	const struct shell    *shell;
+	ping_time_cb_t        p_cb;
 };
 
 /**@brief Set ping request indication callback.
  *
- * @note The @p p_cb argument delay_us will reflect current time in microseconds.
+ * @note The @p p_cb argument delay_us will reflect current time
+ *       in microseconds.
  */
 void zb_ping_set_ping_indication_cb(ping_time_cb_t p_cb);
 
