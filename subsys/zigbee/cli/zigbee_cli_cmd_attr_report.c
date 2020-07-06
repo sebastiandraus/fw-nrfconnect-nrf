@@ -175,7 +175,8 @@ static void cmd_zb_subscribe_unsubscribe_cb(tsn_ctx_t * p_tsn_ctx,
 			cmd_zb_subscribe_unsubscribe_timeout,
 			ZB_ALARM_ANY_PARAM);
 	if (zb_err_code != RET_OK) {
-		print_error(p_tsn_ctx->shell, "Unable to cancel timeout timer", ZB_TRUE);
+		print_error(p_tsn_ctx->shell, "Unable to cancel timeout timer",
+			    ZB_TRUE);
 		goto free_tsn_ctx;
 	}
 
@@ -185,54 +186,54 @@ static void cmd_zb_subscribe_unsubscribe_cb(tsn_ctx_t * p_tsn_ctx,
 		if (p_resp->status == ZB_ZCL_STATUS_SUCCESS) {
 			print_done(p_tsn_ctx->shell, ZB_FALSE);
 		} else {
-			shell_error(p_tsn_ctx->shell, "Error: Unable to configure reporting. Status: %d", p_resp->status);
+			shell_error(p_tsn_ctx->shell, "Error: Unable to configure reporting. Status: %d",
+				    p_resp->status);
 		}
 		goto free_tsn_ctx;
 	}
 
-
 	/* Received a full Configure Reporting Response frame. */
 	ZB_ZCL_GENERAL_GET_NEXT_CONFIGURE_REPORTING_RES(bufid, p_resp);
 	if (p_resp == NULL) {
-		print_error(p_tsn_ctx->shell, "Unable to parse configure reporting response", ZB_TRUE);
+		print_error(p_tsn_ctx->shell, "Unable to parse configure reporting response",
+			    ZB_TRUE);
 		goto free_tsn_ctx;
 	}
 
-	shell_print(p_tsn_ctx->shell, "\n");
 	while (p_resp != NULL) {
 		if (p_resp->status == ZB_ZCL_STATUS_SUCCESS) {
 			switch (p_resp->direction) {
 			case ZB_ZCL_CONFIGURE_REPORTING_SEND_REPORT:
 				shell_print(p_tsn_ctx->shell,
-						"Local subscription to attribute ID %hx updated\n",
-						p_resp->attr_id);
+					    "Local subscription to attribute ID %hx updated",
+					    p_resp->attr_id);
 				break;
 
 			case ZB_ZCL_CONFIGURE_REPORTING_RECV_REPORT:
 				shell_print(p_tsn_ctx->shell,
-						"Remote node subscription to receive attribute ID %hx updated\n",
-						p_resp->attr_id);
+					    "Remote node subscription to receive attribute ID %hx updated",
+					    p_resp->attr_id);
 				break;
 
 			default:
 				shell_error(p_tsn_ctx->shell,
-						"Error: Unknown reporting configuration direction for attribute %hx",
-						p_resp->attr_id);
+					    "Error: Unknown reporting configuration direction for attribute %hx",
+					    p_resp->attr_id);
 				failed = ZB_TRUE;
 				break;
 			}
 		} else {
 			shell_error(p_tsn_ctx->shell,
-					"Error: Unable to configure attribute %hx reporting. Status: %hd",
-					p_resp->attr_id,
-					p_resp->status);
+				    "Error: Unable to configure attribute %hx reporting. Status: %hd",
+				    p_resp->attr_id, p_resp->status);
 			failed = ZB_TRUE;
 		}
 		ZB_ZCL_GENERAL_GET_NEXT_CONFIGURE_REPORTING_RES(bufid, p_resp);
 	}
 
 	if (failed == ZB_TRUE) {
-		print_error(p_tsn_ctx->shell, "One or more attributes reporting were not configured successfully", ZB_TRUE);
+		print_error(p_tsn_ctx->shell, "One or more attributes reporting were not configured successfully",
+			    ZB_TRUE);
 	} else {
 		print_done(p_tsn_ctx->shell, ZB_FALSE);
 	}
@@ -249,17 +250,19 @@ free_tsn_ctx:
  */
 static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
 {
-	zb_zcl_report_attr_req_t * p_attr_resp   = NULL;
-	int                        bytes_written = 0;
-	char                       print_buf[255];
+	zb_zcl_report_attr_req_t *p_attr_resp   = NULL;
+	zb_zcl_addr_t remote_node_data =
+		p_zcl_hdr->addr_data.common_data.source;
+	int bytes_written = 0;
+	char print_buf[255];
 
-	if (p_zcl_hdr->addr_data.common_data.source.addr_type == ZB_ZCL_ADDR_TYPE_SHORT) {
+	if (remote_node_data.addr_type == ZB_ZCL_ADDR_TYPE_SHORT) {
 #ifndef DEVELOPMENT_TODO
-		NRF_LOG_INST_INFO(m_log.p_log, "Received value updates from the remote node 0x%04x",
-						  p_zcl_hdr->addr_data.common_data.source.u.short_addr);
+		NRF_LOG_INST_INFO(m_log.p_log, "Received value updates from the remote node 0x%04x", remote_node_data.u.short_addr);
 #endif
 	} else {
-		bytes_written = ieee_addr_to_str(print_buf, sizeof(print_buf), p_zcl_hdr->addr_data.common_data.source.u.ieee_addr);
+		bytes_written = ieee_addr_to_str(print_buf, sizeof(print_buf),
+						 remote_node_data.u.ieee_addr);
 		if (bytes_written < 0) {
 #ifndef DEVELOPMENT_TODO
 			NRF_LOG_INST_INFO(m_log.p_log, "Received value updates from the remote node (unknown address)");
@@ -276,7 +279,8 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
 	bytes_written = 0;
 	while (p_attr_resp != NULL) {
 		bytes_written = zcl_attr_to_str(&print_buf[bytes_written],
-						sizeof(print_buf) - bytes_written,
+						(sizeof(print_buf) -
+						 bytes_written),
 						p_attr_resp->attr_type,
 						p_attr_resp->attr_value);
 
@@ -302,8 +306,9 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
  */
 static zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid)
 {
-	zb_zcl_parsed_hdr_t * p_cmd_info = ZB_BUF_GET_PARAM(bufid, zb_zcl_parsed_hdr_t);
-	tsn_ctx_t           * p_tsn_ctx;
+	zb_zcl_parsed_hdr_t *p_cmd_info = ZB_BUF_GET_PARAM(bufid,
+							   zb_zcl_parsed_hdr_t);
+	tsn_ctx_t           *p_tsn_ctx;
 
 	if (p_cmd_info->cmd_id == ZB_ZCL_CMD_REPORT_ATTRIB) {
 		print_attr_update(p_cmd_info, bufid);
@@ -331,7 +336,8 @@ static zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid)
  *
  * Enable or disable reporting on the node identified by `addr`,
  * with the endpoint `ep` that uses the profile `profile`
- * of the attribute `attr_id` with the type `attr_type` in the cluster `cluster`.
+ * of the attribute `attr_id` with the type `attr_type`
+ * in the cluster `cluster`.
  *
  * Reports must be generated in intervals not shorter than `min_interval`
  * (1 second by default) and not longer
@@ -389,8 +395,10 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 
 	/* Optional parameters parsing. */
 	if (subscribe == ZB_TRUE) {
-		req.interval_min = ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_MIN_INTERVAL;
-		req.interval_max = ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_MAX_INTERVAL;
+		req.interval_min =
+			ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_MIN_INTERVAL;
+		req.interval_max =
+			ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_MAX_INTERVAL;
 	} else {
 		req.interval_min = ZIGBEE_CLI_CONFIGURE_REPORT_OFF_MIN_INTERVAL;
 		req.interval_max = ZIGBEE_CLI_CONFIGURE_REPORT_OFF_MAX_INTERVAL;
@@ -399,7 +407,7 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 	if (argc > 7) {
 		req.interval_min = strtoul(argv[7], NULL, 16);
 		if ((argv[7][0] == '0') && ((argv[7][1] == 'x') ||
-		     (argv[7][1] == 'X'))) {
+		    (argv[7][1] == 'X'))) {
 			print_error(shell, "Incorrect minimum interval",
 				    ZB_FALSE);
 			return -EINVAL;
@@ -409,7 +417,7 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 	if (argc > 8) {
 		req.interval_max = strtoul(argv[8], NULL, 16);
 		if ((argv[8][0] == '0') && ((argv[8][1] == 'x') ||
-		     (argv[8][1] == 'X'))) {
+		    (argv[8][1] == 'X'))) {
 			print_error(shell, "Incorrect maximum interval",
 				    ZB_FALSE);
 			return -EINVAL;
@@ -455,7 +463,8 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 			ZIGBEE_CLI_CONFIGURE_REPORT_RESP_TIMEOUT *
 			 ZB_TIME_ONE_SECOND);
 	if (zb_err_code != RET_OK) {
-		print_error(shell, "Unable to schedule timeout timer", ZB_FALSE);
+		print_error(shell, "Unable to schedule timeout timer",
+			    ZB_FALSE);
 		invalidate_ctx(p_tsn_cli);
 	}
 	return 0;
