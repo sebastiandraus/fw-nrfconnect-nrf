@@ -40,26 +40,7 @@
  */
 #define ZIGBEE_CLI_CONFIGURE_REPORT_OFF_MAX_INTERVAL 0xFFFF
 
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG To be done done here, to be decided here"
-// #if NRF_LOG_ENABLED
-/**@brief Name of the submodule used for logger messaging.
- */
-#define NRF_LOG_SUBMODULE_NAME report
-
-NRF_LOG_INSTANCE_REGISTER(ZIGBEE_CLI_LOG_NAME, NRF_LOG_SUBMODULE_NAME,
-			  ZIGBEE_CLI_CONFIG_INFO_COLOR,
-			  ZIGBEE_CLI_CONFIG_DEBUG_COLOR,
-			  ZIGBEE_CLI_CONFIG_LOG_INIT_FILTER_LEVEL,
-			  ZIGBEE_CLI_CONFIG_LOG_ENABLED ?
-			   ZIGBEE_CLI_CONFIG_LOG_LEVEL : NRF_LOG_SEVERITY_NONE);
-
-/* This structure keeps reference to the logger instance used by this module. */
-typedef struct {
-	NRF_LOG_INSTANCE_PTR_DECLARE(p_log)
-} log_ctx_t;
-// #endif /* defined (NRF_LOG_ENABLED) */
-#endif
+LOG_MODULE_REGISTER(report, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
 /* This structure allows for binding ZBOSS transaction and CLI object. */
 typedef struct {
@@ -83,17 +64,6 @@ typedef struct {
 	addr_type_t remote_addr_mode;
 	zb_uint8_t  remote_ep;
 } configure_reporting_req_t;
-
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG Submodule to be done here"
-// #if NRF_LOG_ENABLED
-/* Logger instance used by this module. */
-static log_ctx_t m_log = {
-	NRF_LOG_INSTANCE_PTR_INIT(p_log, ZIGBEE_CLI_LOG_NAME,
-				  NRF_LOG_SUBMODULE_NAME)
-};
-// #endif /* defined (NRF_LOG_ENABLED) */
-#endif
 
 static tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_CONFIGURE_REPORT_TSN];
 
@@ -257,20 +227,15 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
 	char print_buf[255];
 
 	if (remote_node_data.addr_type == ZB_ZCL_ADDR_TYPE_SHORT) {
-#ifndef DEVELOPMENT_TODO
-		NRF_LOG_INST_INFO(m_log.p_log, "Received value updates from the remote node 0x%04x", remote_node_data.u.short_addr);
-#endif
+		LOG_INF("Received value updates from the remote node 0x%04x",
+			remote_node_data.u.short_addr);
 	} else {
 		bytes_written = ieee_addr_to_str(print_buf, sizeof(print_buf),
 						 remote_node_data.u.ieee_addr);
 		if (bytes_written < 0) {
-#ifndef DEVELOPMENT_TODO
-			NRF_LOG_INST_INFO(m_log.p_log, "Received value updates from the remote node (unknown address)");
-#endif
+			LOG_INF("Received value updates from the remote node (unknown address)");
 		} else {
-#ifndef DEVELOPMENT_TODO
-			NRF_LOG_INST_INFO(m_log.p_log, "Received value updates from the remote node 0x%s", nrf_log_push(print_buf));
-#endif
+			LOG_INF("Received value updates from the remote node 0x%s");
 		}
 	}
 
@@ -285,13 +250,11 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
 						p_attr_resp->attr_value);
 
 		if (bytes_written < 0) {
-#ifndef DEVELOPMENT_TODO
-			NRF_LOG_ERROR("    Unable to print updated attribute value");
-#endif
+			LOG_ERR("    Unable to print updated attribute value");
 		} else {
-#ifndef DEVELOPMENT_TODO
-			NRF_LOG_INST_INFO(m_log.p_log, "    Profile: 0x%04x Cluster: 0x%04x Attribute: 0x%04x Type: %hu Value: %s", p_zcl_hdr->profile_id, p_zcl_hdr->cluster_id, p_attr_resp->attr_id, p_attr_resp->attr_type, nrf_log_push(print_buf));
-#endif
+			LOG_INF("    Profile: 0x%04x Cluster: 0x%04x Attribute: 0x%04x Type: %hu Value: %s",
+				p_zcl_hdr->profile_id, p_zcl_hdr->cluster_id,
+				p_attr_resp->attr_id, p_attr_resp->attr_type);
 		}
 
 		ZB_ZCL_GENERAL_GET_NEXT_REPORT_ATTR_REQ(bufid, p_attr_resp);
