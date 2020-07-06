@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdlib.h>
 #include <shell/shell.h>
 
 #include <zb_nrf_platform.h>
@@ -38,6 +39,8 @@ typedef struct {
 } log_ctx_t;
 // #endif // NRF_LOG_ENABLED
 #endif
+
+LOG_MODULE_DECLARE(cli);
 
 /**@brief The row of the table which holds the replies which are to be sent.
  *
