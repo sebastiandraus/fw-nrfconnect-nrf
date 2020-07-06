@@ -24,25 +24,23 @@ NRF_SECTION_DEF(zb_ep_handlers, zb_device_handler_t);
 
 zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid)
 {
-    unsigned int idx;
+	unsigned int idx;
 
 // #if defined(DEBUG_NRF) && NRF_LOG_ENABLED
-    UNUSED_RETURN_VALUE(zigbee_logger_eprxzcl_ep_handler(bufid));
+	UNUSED_RETURN_VALUE(zigbee_logger_eprxzcl_ep_handler(bufid));
 // #endif
 
-    for (idx = 0; idx < ZB_EP_HANDLER_SECTION_ITEM_COUNT; idx++)
-    {
-        zb_device_handler_t handler = *(ZB_EP_HANDLER_SECTION_ITEM_GET(idx));
-        if (handler(bufid) == ZB_TRUE)
-        {
-            return ZB_TRUE;
-        }
-    }
+	for (idx = 0; idx < ZB_EP_HANDLER_SECTION_ITEM_COUNT; idx++) {
+		zb_device_handler_t handler = *(ZB_EP_HANDLER_SECTION_ITEM_GET(idx));
+		if (handler(bufid) == ZB_TRUE) {
+			return ZB_TRUE;
+		}
+	}
 
-    return ZB_FALSE;
+	return ZB_FALSE;
 }
-#endif
 //TODO: REMOVE
+#endif
 
 int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 		    zb_uint8_t * p_attr)
