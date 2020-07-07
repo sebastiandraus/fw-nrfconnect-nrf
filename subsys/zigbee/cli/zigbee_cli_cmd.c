@@ -16,13 +16,13 @@
 #include "zigbee_cli_utils.h"
 
 #define DEBUG_HELP \
-	"Returns state of debug mode.\n"
+	"Return state of debug mode.\n"
 
 #define DEBUG_ON_HELP \
-	"Turns on debug mode.\n"
+	"Turn on debug mode.\n"
 
 #define DEBUG_OFF_HELP \
-	"Turns off debug mode.\n"
+	"Turn off debug mode.\n"
 
 #define DEBUG_WARN_MSG \
 	"You are about to turn the debug mode on. This unblocks several\n" \
@@ -112,8 +112,8 @@ static int cmd_debug_on_off(const struct shell *shell, size_t argc, char **argv)
 }
 #endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
 
-SHELL_CMD_REGISTER(version, NULL, "Prints firmware version", cmd_version);
-SHELL_CMD_REGISTER(reset, NULL, "Resets the board", cmd_reset);
+SHELL_CMD_REGISTER(version, NULL, "Print firmware version", cmd_version);
+SHELL_CMD_REGISTER(reset, NULL, "Reset the board", cmd_reset);
 
 #ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,

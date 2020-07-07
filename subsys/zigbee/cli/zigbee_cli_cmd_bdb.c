@@ -252,7 +252,7 @@ static int cmd_zb_panid(const struct shell *shell, size_t argc, char **argv)
 /**@brief Set or get 802.15.4 channel.
  *
  * @code
- * bdb channel <n>
+ * bdb channel [<n>]
  * @endcode
  *
  *  @pre Setting only before @ref start "bdb start".
@@ -354,8 +354,8 @@ static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
  *  on the trust center, set the trust center install code policy.
  *
  * @code
- * bdb ic add <h:install code> <h:eui64>
- * bdb ic set <h:install code>
+ * bdb ic add <h:install_code> <h:eui64>
+ * bdb ic set <h:install_code>
  * bdb ic policy <enable|disable>
  * @endcode
  *
@@ -464,7 +464,7 @@ exit:
 /**@brief Enable or disable the legacy device support.
  *
  * @code
- * bdb legacy <enable|disable>
+ * bdb legacy [<enable|disable>]
  * @endcode
  *
  * Allow or disallow legacy pre-r21 devices on the Zigbee network.
@@ -515,7 +515,7 @@ static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
 /**@brief Set network key.
  *
  * @code
- * bdb nwkkey <h:key>>
+ * bdb nwkkey <h:key>
  * @endcode
  *
  * Set a pre-defined network key instead of a random one.
@@ -628,8 +628,8 @@ zb_bool_t zb_cli_is_stack_started(void)
 
 // BDB IC
 // "ic - set or add install code. Enable IC policy.\r\n"
-// "ic set <h:install code> - set the ic code to <install_code>\r\n"
-// "ic add <h:install code> <h:eui64> - add ic for device with given eui64\r\n"
+// "ic set <h:install_code> - set the ic code to <install_code>\r\n"
+// "ic add <h:install_code> <h:eui64> - add ic for device with given eui64\r\n"
 // "ic policy - set Trust Center install code policy");
 
 // BDB legacy
@@ -646,23 +646,65 @@ zb_bool_t zb_cli_is_stack_started(void)
 // "child_max <d:children_nbr> - set the amount of child devices to <children_nbr>\r\n"
 // "If n is [0:32], set to that number. Otherwise, return error.");
 
+#define IC_ADD_HELP \
+    ("Add install code for device with given eui64.\n" \
+    "Usage: add <h:install_code> <h:eui64>")
+
+#define IC_POLICY_HELP \
+    ("Set Trust Center install code policy.\n" \
+    "Usage: policy <enable|disable>")
+
+#define IC_SET_POLICY \
+    ("Add install code for device with given eui64.\n" \
+    "Usage: add <h:install_code> <h:eui64>")
+
+#define CHANNEL_HELP \
+    ("Set/get channel.\n" \
+    "Usage: channel [<n>]\n" \
+    "If n is [11:26], set to that channel. Otherwise, treat n as bitmask.")
+
+#define CHILD_MAX_HELP \
+    ("Set max_child number.\n" \
+    "Usage: child_max <d:children_nbr>")
+
+#define EXTPANID_HELP \
+    ("Set/get extpanid.\n" \
+    "Usage: extpanid [<h:id>]")
+
+#define LEGACY_HELP \
+    ("Get/enable/disable legacy mode.\n" \
+    "Usage: legacy [<enable|disable>]")
+
+#define NWKKEY_HELP \
+    ("Set network key.\n" \
+    "Usage: nwkkey <h:key>")
+
+#define PANID_HELP \
+    ("Set/get panid. \n" \
+    "Usage: panid [<h:id>]")
+
+#define ROLE_HELP \
+    ("Set/get role.\n" \
+    "Usage: role [<role>]")
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_ic,
-    SHELL_CMD_ARG(add, NULL, "Adds install code", cmd_zb_install_code, 3, 0),
-    SHELL_CMD_ARG(policy, NULL, "Sets TC install code policy", cmd_zb_install_code, 2, 0),
-    SHELL_CMD_ARG(set, NULL, "Sets install code", cmd_zb_install_code, 2, 0),
+    SHELL_CMD_ARG(add, NULL, IC_ADD_HELP, cmd_zb_install_code, 3, 0),
+    SHELL_CMD_ARG(policy, NULL, IC_POLICY_HELP, cmd_zb_install_code, 2, 0),
+    SHELL_CMD_ARG(set, NULL, IC_SET_POLICY, cmd_zb_install_code, 2, 0),
     SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_bdb,
-    SHELL_CMD_ARG(channel, NULL, "channel get/set", cmd_zb_channel, 1, 1),
-    SHELL_CMD_ARG(child_max, NULL, "max_child set", cmd_child_max, 2, 0),
-    SHELL_CMD_ARG(extpanid, NULL, "extpanid get/set", cmd_zb_extpanid, 1, 1),
-    SHELL_CMD_ARG(factory_reset, NULL, "factory reset", cmd_zb_factory_reset, 1, 0),
-    SHELL_CMD(ic, &sub_ic, "install code manipulation", NULL),
-    SHELL_CMD_ARG(legacy, NULL, "legacy mode enable/disable", cmd_zb_legacy, 1, 1),
-    SHELL_CMD_ARG(nwkkey, NULL, "network key set", cmd_zb_nwkkey, 2, 0),
-    SHELL_CMD_ARG(panid, NULL, "panid get/set", cmd_zb_panid, 1, 1),
-    SHELL_CMD_ARG(role, NULL, "role get/set", cmd_zb_role, 1, 1),
-    SHELL_CMD(start, NULL, "start commissionning", cmd_zb_start),
+    SHELL_CMD_ARG(channel, NULL, CHANNEL_HELP, cmd_zb_channel, 1, 1),
+    SHELL_CMD_ARG(child_max, NULL, CHILD_MAX_HELP, cmd_child_max, 2, 0),
+    SHELL_CMD_ARG(extpanid, NULL, EXTPANID_HELP, cmd_zb_extpanid, 1, 1),
+    SHELL_CMD_ARG(factory_reset, NULL, "Perform factory reset.",
+                  cmd_zb_factory_reset, 1, 0),
+    SHELL_CMD(ic, &sub_ic, "Install code manipulation.", NULL),
+    SHELL_CMD_ARG(legacy, NULL, LEGACY_HELP, cmd_zb_legacy, 1, 1),
+    SHELL_CMD_ARG(nwkkey, NULL, NWKKEY_HELP, cmd_zb_nwkkey, 2, 0),
+    SHELL_CMD_ARG(panid, NULL, PANID_HELP, cmd_zb_panid, 1, 1),
+    SHELL_CMD_ARG(role, NULL, ROLE_HELP, cmd_zb_role, 1, 1),
+    SHELL_CMD_ARG(start, NULL, "Start commissionning", cmd_zb_start, 1, 0),
     SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(bdb, &sub_bdb, "base device behaviour manipulation", NULL);
+SHELL_CMD_REGISTER(bdb, &sub_bdb, "Base device behaviour manipulation", NULL);
