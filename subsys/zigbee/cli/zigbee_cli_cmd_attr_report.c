@@ -235,14 +235,15 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
 		if (bytes_written < 0) {
 			LOG_INF("Received value updates from the remote node (unknown address)");
 		} else {
-			LOG_INF("Received value updates from the remote node 0x%s");
+			LOG_INF("Received value updates from the remote node 0x%s",
+				print_buf);
 		}
 	}
 
 	/* Get the contents of Read Attribute Response frame. */
 	ZB_ZCL_GENERAL_GET_NEXT_REPORT_ATTR_REQ(bufid, p_attr_resp);
-	bytes_written = 0;
 	while (p_attr_resp != NULL) {
+		bytes_written = 0;
 		bytes_written = zcl_attr_to_str(&print_buf[bytes_written],
 						(sizeof(print_buf) -
 						 bytes_written),
@@ -254,7 +255,8 @@ static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
 		} else {
 			LOG_INF("    Profile: 0x%04x Cluster: 0x%04x Attribute: 0x%04x Type: %hu Value: %s",
 				p_zcl_hdr->profile_id, p_zcl_hdr->cluster_id,
-				p_attr_resp->attr_id, p_attr_resp->attr_type);
+				p_attr_resp->attr_id, p_attr_resp->attr_type,
+				print_buf);
 		}
 
 		ZB_ZCL_GENERAL_GET_NEXT_REPORT_ATTR_REQ(bufid, p_attr_resp);
