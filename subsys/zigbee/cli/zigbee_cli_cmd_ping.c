@@ -19,28 +19,9 @@
  */
 #define ZIGBEE_PING_FRAME_CONTROL_FIELD 0x11
 
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG problem here"
-// #if NRF_LOG_ENABLED
-/** @brief Name of the submodule used for logger messaging.
- */
-#define NRF_LOG_SUBMODULE_NAME ping
+#define LOG_SUBMODULE_NAME ping
 
-NRF_LOG_INSTANCE_REGISTER(ZIGBEE_CLI_LOG_NAME, NRF_LOG_SUBMODULE_NAME,
-			  ZIGBEE_CLI_CONFIG_INFO_COLOR,
-			  ZIGBEE_CLI_CONFIG_DEBUG_COLOR,
-			  ZIGBEE_CLI_CONFIG_LOG_INIT_FILTER_LEVEL,
-			  ZIGBEE_CLI_CONFIG_LOG_ENABLED ?
-			  ZIGBEE_CLI_CONFIG_LOG_LEVEL : NRF_LOG_SEVERITY_NONE);
-
-/* This structure keeps reference to the logger instance used by this module. */
-typedef struct {
-	NRF_LOG_INSTANCE_PTR_DECLARE(p_log)
-} log_ctx_t;
-// #endif // NRF_LOG_ENABLED
-#endif
-
-LOG_MODULE_DECLARE(cli);
+LOG_MODULE_REGISTER(LOG_SUBMODULE_NAME, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
 /**@brief The row of the table which holds the replies which are to be sent.
  *
@@ -62,16 +43,6 @@ static ping_request_t m_ping_request_table[PING_TABLE_SIZE];
 static ping_reply_t   m_ping_reply_table[PING_TABLE_SIZE];
 static u8_t           m_ping_seq_num;
 static ping_time_cb_t mp_ping_ind_cb = NULL;
-
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG Problem here"
-// #if NRF_LOG_ENABLED
-/* Logger instance used by this module. */
-static log_ctx_t m_log = {
-	NRF_LOG_INSTANCE_PTR_INIT(p_log, ZIGBEE_CLI_LOG_NAME, NRF_LOG_SUBMODULE_NAME)
-};
-// #endif // NRF_LOG_ENABLED
-#endif
 
 static zb_uint32_t get_request_duration(ping_request_t * p_request);
 
@@ -296,10 +267,8 @@ static zb_void_t dispatch_user_callback(zb_bufid_t bufid)
 		short_addr = zb_address_short_by_ieee(
 				p_cmd_ping_status->dst_addr.u.ieee_addr);
 	} else {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN"
-		NRF_LOG_INST_ERROR(m_log.p_log, "Ping request acknowledged with an unknown destination address type: %d", p_cmd_ping_status->dst_addr.addr_type);
-#endif
+		LOG_ERR("Ping request acknowledged with an unknown destination address type: %d",
+			p_cmd_ping_status->dst_addr.addr_type);
 		zb_buf_free(bufid);
 		return;
 	}
@@ -332,16 +301,12 @@ static zb_void_t dispatch_user_callback(zb_bufid_t bufid)
 				}
 			}
 		} else {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG problem here"
-			NRF_LOG_INST_ERROR(m_log.p_log, "Ping request returned error status: %d", p_cmd_ping_status->status);
-#endif
+			LOG_ERR("Ping request returned error status: %d",
+				p_cmd_ping_status->status);
 		}
 	} else {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG problem here"
-		NRF_LOG_INST_WARNING(m_log.p_log, "Unknown ping command callback called with status: %d", p_cmd_ping_status->status);
-#endif
+		LOG_WRN("Unknown ping command callback called with status: %d",
+			p_cmd_ping_status->status);
 	}
 
 	zb_buf_free(bufid);
@@ -390,10 +355,7 @@ static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_us,
 		break;
 
 	default:
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG problem here"
-		NRF_LOG_INST_ERROR(m_log.p_log, "Unknown ping event received: %d", evt);
-#endif
+		LOG_ERR("Unknown ping event received: %d", evt);
 		break;
 	}
 }
@@ -500,17 +462,12 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 
 	bufid = zb_buf_get_out();
 	if (!bufid) {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN"
-		NRF_LOG_INST_WARNING(m_log.p_log, "Drop ping request due to the lack of output buffers");
-#endif
+		LOG_WRN("Drop ping request due to the lack of output buffers");
 		ping_release_reply(p_reply);
 		return;
 	}
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN"
-	NRF_LOG_INST_DEBUG(m_log.p_log, "Send ping reply");
-#endif
+	LOG_DBG("Send ping reply");
+
 	p_cmd_buf = ZB_ZCL_START_PACKET(bufid);
 	*(p_cmd_buf++) = ZIGBEE_PING_FRAME_CONTROL_FIELD;
 	*(p_cmd_buf++) = p_reply->ping_seq;
@@ -588,10 +545,7 @@ static void ping_req_indicate(zb_bufid_t zcl_cmd_bufid)
 	tmp_request.sent     = abs_time_now();
 
 	if (remote_node_addr.addr_type != ZB_ZCL_ADDR_TYPE_SHORT) {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN"
-		NRF_LOG_INFO("Ping request received, but indication will not be generated due to the unsupported address type.")
-#endif
+		LOG_INF("Ping request received, but indication will not be generated due to the unsupported address type.");
 		/* Not supported. */
 		return;
 	}
@@ -622,10 +576,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 		return ZB_FALSE;
 	}
 
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG here again"
-	NRF_LOG_INST_DEBUG(m_log.p_log, "New ping frame received, bufid: %d", bufid);
-#endif
+	LOG_DBG("New ping frame received, bufid: %d", bufid);
 	ping_req_indicate(bufid);
 
 	if (p_cmd_info->cmd_id == PING_ECHO_REPLY) {
@@ -683,10 +634,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 		ping_reply_t * p_reply = ping_aquire_reply();
 
 		if (p_reply == NULL) {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN!"
-			NRF_LOG_INST_WARNING(m_log.p_log, "Cannot obtain new row for incoming ping request");
-#endif
+			LOG_WRN("Cannot obtain new row for incoming ping request");
 			return ZB_FALSE;
 		}
 
@@ -697,16 +645,10 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 		p_reply->ping_seq = p_cmd_info->seq_number;
 
 		if (p_cmd_info->cmd_id == PING_ECHO_REQUEST) {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN!"
-			NRF_LOG_INST_DEBUG(m_log.p_log, "PING echo request with APS ACK received");
-#endif
+			LOG_DBG("PING echo request with APS ACK received");
 			p_reply->send_ack = 1;
 		} else {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN!"
-			NRF_LOG_INST_DEBUG(m_log.p_log, "PING echo request without APS ACK received");
-#endif
+			LOG_DBG("PING echo request without APS ACK received");
 			p_reply->send_ack = 0;
 		}
 
@@ -714,10 +656,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 			p_reply->remote_short_addr =
 				remote_node_addr.u.short_addr;
 		} else {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN!"
-			NRF_LOG_INST_WARNING(m_log.p_log, "Drop ping request due to incorrect address type");
-#endif
+			LOG_WRN("Drop ping request due to incorrect address type");
 			ping_release_reply(p_reply);
 			zb_buf_free(bufid);
 			return ZB_TRUE;
@@ -726,15 +665,10 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 		/* Send the Ping Reply, invalidate the row if not possible. */
 		ping_reply_send(p_reply);
 	} else if (p_cmd_info->cmd_id == PING_NO_ECHO_REQUEST) {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN!"
-		NRF_LOG_INST_DEBUG(m_log.p_log, "PING request without ECHO received");
-#endif
+		LOG_DBG("PING request without ECHO received");
 	} else {
-#ifndef DEVELOPMENT_TODO
-#error "NRF LOG AGAIN!"
-		NRF_LOG_INST_WARNING(m_log.p_log, "Unsupported Ping message received, cmd_id %d	", p_cmd_info->cmd_id);
-#endif
+		LOG_WRN("Unsupported Ping message received, cmd_id %d",
+			p_cmd_info->cmd_id);
 	}
 
 	zb_buf_free(bufid);
