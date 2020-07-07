@@ -9,6 +9,7 @@
 #include <logging/log.h>
 #include <init.h>
 
+#include <zigbee_cli.h>
 #include <zboss_api.h>
 #include "zb_nrf_platform.h"
 #include "zb_nrf_crypto.h"
@@ -258,6 +259,8 @@ static int zigbee_init(struct device *unused)
 static void zboss_thread(void *arg1, void *arg2, void *arg3)
 {
 	zb_ret_t zb_err_code;
+
+	zb_cli_init();
 
 	zb_err_code = zboss_start_no_autostart();
 	__ASSERT(zb_err_code == RET_OK, "Error when starting ZBOSS stack!");

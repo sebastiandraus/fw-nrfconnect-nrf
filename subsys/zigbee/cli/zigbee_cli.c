@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <shell/shell.h>
-
+#include <shell/shell_uart.h>
 #include "zigbee_cli.h"
 
 /* CLI Agent endpoint. */
@@ -32,6 +32,24 @@ static zb_bool_t m_suspended = ZB_FALSE;
 #endif
 
 LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
+
+void zb_cli_init(void)
+{
+#ifdef CONFIG_ZIGBEE_SHELL_PROMPT
+	zb_set_cli_shell_prompt(CONFIG_ZIGBEE_SHELL_PROMPT);
+#endif
+}
+
+void zb_set_cli_shell_prompt(const char *new_prompt)
+{
+#ifdef CONFIG_SHELL_BACKEND_SERIAL
+	if(shell_prompt_change(shell_backend_uart_get_ptr(), new_prompt)) {
+		LOG_ERR("Can not change shell prompt");
+	}
+#else
+	LOG_ERR("Selected shell is not supported.");
+#endif
+}
 
 /**@brief Returns the number of the Endpoint used by the CLI.
  */

@@ -12,6 +12,10 @@
 #include <zboss_api.h>
 #include <zigbee_helpers.h>
 
+void zb_cli_init(void);
+
+void zb_set_cli_shell_prompt(const char *new_prompt);
+
 /**@brief Function for returning the number of the endpoint used by the CLI.
  */
 zb_uint8_t zb_get_cli_endpoint(void);
