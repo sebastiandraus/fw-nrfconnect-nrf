@@ -12,6 +12,47 @@
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
 
+#define IC_ADD_HELP \
+	("Add install code for device with given eui64.\n" \
+	"Usage: add <h:install_code> <h:eui64>")
+
+#define IC_POLICY_HELP \
+	("Set Trust Center install code policy.\n" \
+	"Usage: policy <enable|disable>")
+
+#define IC_SET_POLICY \
+	("Add install code for device with given eui64.\n" \
+	"Usage: add <h:install_code> <h:eui64>")
+
+#define CHANNEL_HELP \
+	("Set/get channel.\n" \
+	"Usage: channel [<n>]\n" \
+	"If n is [11:26], set to that channel. Otherwise, treat n as bitmask.")
+
+#define CHILD_MAX_HELP \
+	("Set max_child number.\n" \
+	"Usage: child_max <d:children_nbr>")
+
+#define EXTPANID_HELP \
+	("Set/get extpanid.\n" \
+	"Usage: extpanid [<h:id>]")
+
+#define LEGACY_HELP \
+	("Get/enable/disable legacy mode.\n" \
+	"Usage: legacy [<enable|disable>]")
+
+#define NWKKEY_HELP \
+	("Set network key.\n" \
+	"Usage: nwkkey <h:key>")
+
+#define PANID_HELP \
+	("Set/get panid. \n" \
+	"Usage: panid [<h:id>]")
+
+#define ROLE_HELP \
+	("Set/get role.\n" \
+	"Usage: role [<role>]")
+
 static zb_nwk_device_type_t m_default_role      = ZB_NWK_DEVICE_TYPE_ROUTER;
 static zb_bool_t            m_stack_is_started  = ZB_FALSE;
 static zb_bool_t            m_legacy_mode       = ZB_FALSE;
@@ -22,7 +63,8 @@ static zb_bool_t            m_legacy_mode       = ZB_FALSE;
  * bdb role [<role>]
  * @endcode
  *
- * @pre Setting only before @ref start "bdb start". Reading only after @ref start "bdb start".
+ * @pre Setting only before @ref start "bdb start". Reading only
+ *      after @ref start "bdb start".
  *
  * If the optional argument is not provided, get the state of the device.<br>
  *    Returns:
@@ -38,56 +80,41 @@ static zb_bool_t            m_legacy_mode       = ZB_FALSE;
  */
 static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
 {
-    zb_nwk_device_type_t role;
+	zb_nwk_device_type_t role;
 
-    if (argc == 1)
-    {
-        role = zb_get_network_role();
-        if (role == ZB_NWK_DEVICE_TYPE_NONE)
-        {
-            role = m_default_role;
-        }
+	if (argc == 1) {
+		role = zb_get_network_role();
+		if (role == ZB_NWK_DEVICE_TYPE_NONE) {
+			role = m_default_role;
+		}
 
-        if (role == ZB_NWK_DEVICE_TYPE_COORDINATOR)
-        {
-            shell_print(shell, "zc");
-        }
-        else if (role == ZB_NWK_DEVICE_TYPE_ROUTER)
-        {
-            shell_print(shell, "zr");
-        }
-        else if (role == ZB_NWK_DEVICE_TYPE_ED)
-        {
-            shell_print(shell, "zed");
-        }
-    }
-    else if (argc == 2)
-    {
-        if (m_stack_is_started)
-        {
-            print_error(shell, "Stack already started", ZB_FALSE);
-            return -ENOEXEC;
-        }
+		if (role == ZB_NWK_DEVICE_TYPE_COORDINATOR) {
+			shell_print(shell, "zc");
+		} else if (role == ZB_NWK_DEVICE_TYPE_ROUTER) {
+			shell_print(shell, "zr");
+		} else if (role == ZB_NWK_DEVICE_TYPE_ED) {
+			shell_print(shell, "zed");
+		}
+	} else if (argc == 2) {
+		if (m_stack_is_started) {
+			print_error(shell, "Stack already started", ZB_FALSE);
+			return -ENOEXEC;
+		}
 
-        if (!strcmp(argv[1], "zc"))
-        {
-            m_default_role = ZB_NWK_DEVICE_TYPE_COORDINATOR;
-            shell_print(shell, "Coordinator set");
-        }
-        else if (!strcmp(argv[1], "zr"))
-        {
-            m_default_role = ZB_NWK_DEVICE_TYPE_ROUTER;
-            shell_print(shell, "Router role set");
-        }
-        else
-        {
-            print_error(shell, "Role unsupported", ZB_FALSE);
-            return -ENOEXEC;
-        }
-    }
+		if (!strcmp(argv[1], "zc")) {
+			m_default_role = ZB_NWK_DEVICE_TYPE_COORDINATOR;
+			shell_print(shell, "Coordinator set");
+		} else if (!strcmp(argv[1], "zr")) {
+			m_default_role = ZB_NWK_DEVICE_TYPE_ROUTER;
+			shell_print(shell, "Router role set");
+		} else {
+			print_error(shell, "Role unsupported", ZB_FALSE);
+			return -ENOEXEC;
+		}
+	}
 
-    print_done(shell, ZB_FALSE);
-    return 0;
+	print_done(shell, ZB_FALSE);
+	return 0;
 }
 
 /**@brief Start bdb top level commissioning process.
@@ -108,56 +135,47 @@ static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
 {
-    u32_t      channel;
-    zb_bool_t  ret;
-    zb_uint8_t mode_mask = ZB_BDB_NETWORK_STEERING;
+	u32_t      channel;
+	zb_bool_t  ret;
+	zb_uint8_t mode_mask = ZB_BDB_NETWORK_STEERING;
 
-    if (m_stack_is_started == ZB_FALSE)
-    {
-        channel = zb_get_bdb_primary_channel_set();
+	if (m_stack_is_started == ZB_FALSE) {
+		channel = zb_get_bdb_primary_channel_set();
 
-        switch (m_default_role)
-        {
-            case ZB_NWK_DEVICE_TYPE_ROUTER:
-                zb_set_network_router_role(channel);
-                shell_print(shell, "Started router");
-                break;
+		switch (m_default_role) {
+		case ZB_NWK_DEVICE_TYPE_ROUTER:
+			zb_set_network_router_role(channel);
+			shell_print(shell, "Started router");
+			break;
 
-            case ZB_NWK_DEVICE_TYPE_COORDINATOR:
-                zb_set_network_coordinator_role(channel);
-                shell_print(shell, "Started coordinator");
-                break;
+		case ZB_NWK_DEVICE_TYPE_COORDINATOR:
+			zb_set_network_coordinator_role(channel);
+			shell_print(shell, "Started coordinator");
+			break;
 
-            default:
-                print_error(shell, "Role unsupported", ZB_FALSE);
-                return -ENOEXEC;
-        }
+		default:
+			print_error(shell, "Role unsupported", ZB_FALSE);
+			return -ENOEXEC;
+		}
 
-        if (zboss_start_no_autostart() == RET_OK)
-        {
-            ret = ZB_TRUE;
-        }
-        else
-        {
-            ret = ZB_FALSE;
-        }
-    }
-    else
-    {
-        ret = bdb_start_top_level_commissioning(mode_mask);
-    }
+		if (zboss_start_no_autostart() == RET_OK) {
+			ret = ZB_TRUE;
+		} else {
+			ret = ZB_FALSE;
+		}
+	} else {
+		ret = bdb_start_top_level_commissioning(mode_mask);
+	}
 
-    if (ret)
-    {
-        m_stack_is_started = ZB_TRUE;
-        print_done(shell, ZB_FALSE);
-        return 0;
-    }
-    else
-    {
-        print_error(shell, "Could not start top level commissioning", ZB_FALSE);
-        return -ENOEXEC;
-    }
+	if (ret) {
+		m_stack_is_started = ZB_TRUE;
+		print_done(shell, ZB_FALSE);
+		return 0;
+	} else {
+		print_error(shell, "Could not start top level commissioning",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 }
 
 /**@brief Set or get the Zigbee Extended Pan ID value.
@@ -166,9 +184,11 @@ static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
  * bdb extpanid [<h:id>]
  * @endcode
  *
- * @pre Setting only before @ref start "bdb start". Reading only after @ref start "bdb start".
+ * @pre Setting only before @ref start "bdb start". Reading only after
+ *      @ref start "bdb start".
  *
- * If the optional argument is not provided, gets the extended PAN ID of the joined network.
+ * If the optional argument is not provided, gets the extended PAN ID
+ * of the joined network.
  *
  * If the optional argument is provided, gets the extended PAN ID to `id`.
  *
@@ -176,34 +196,29 @@ static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
 {
-    zb_ext_pan_id_t extpanid;
+	zb_ext_pan_id_t extpanid;
 
-    if (argc == 1)
-    {
-        zb_get_extended_pan_id(extpanid);
-        print_eui64(shell, extpanid);
-        print_done(shell, ZB_FALSE);
-    }
-    else if (argc == 2)
-    {
-        if (parse_long_address(argv[1], extpanid))
-        {
-            zb_set_extended_pan_id(extpanid);
-            print_done(shell, ZB_FALSE);
-        }
-        else
-        {
-            print_error(shell, "Failed to parse extpanid", ZB_FALSE);
-            return -EINVAL;
-        }
-    }
-    else
-    {
-        print_error(shell, "Unsupported format. Expected extpanid <extpanid>", ZB_FALSE);
-        return -EINVAL;
-    }
+	if (argc == 1) {
+		zb_get_extended_pan_id(extpanid);
+		print_eui64(shell, extpanid);
+		print_done(shell, ZB_FALSE);
+	} else if (argc == 2) {
+		if (parse_long_address(argv[1], extpanid)) {
+			zb_set_extended_pan_id(extpanid);
+			print_done(shell, ZB_FALSE);
+		} else {
+			print_error(shell, "Failed to parse extpanid",
+				    ZB_FALSE);
+			return -EINVAL;
+		}
+	} else {
+		print_error(shell,
+			    "Unsupported format. Expected extpanid <extpanid>",
+			    ZB_FALSE);
+		return -EINVAL;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**@brief Set or get the Zigbee Pan ID value.
@@ -212,41 +227,36 @@ static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
  * bdb panid [<h:id>]
  * @endcode
  *
- * @pre Setting only before @ref start "bdb start". Reading only after @ref start "bdb start".
+ * @pre Setting only before @ref start "bdb start". Reading only
+ *      after @ref start "bdb start".
  *
- * If the optional argument is not provided, gets the PAN ID of the joined network.
+ * If the optional argument is not provided, gets the PAN ID
+ * of the joined network.
  * If the optional argument is provided, sets the PAN ID to `id`.
  *
  */
 static int cmd_zb_panid(const struct shell *shell, size_t argc, char **argv)
 {
-    if (argc == 1)
-    {
-        shell_print(shell, "%0x", ZB_PIBCACHE_PAN_ID());
-        print_done(shell, ZB_FALSE);
-    }
-    else if (argc == 2)
-    {
-        zb_uint16_t pan_id;
+	if (argc == 1) {
+		shell_print(shell, "%0x", ZB_PIBCACHE_PAN_ID());
+		print_done(shell, ZB_FALSE);
+	} else if (argc == 2) {
+		zb_uint16_t pan_id;
 
-        if (parse_hex_u16(argv[1], &pan_id))
-        {
-            ZB_PIBCACHE_PAN_ID() = pan_id;
-            print_done(shell, ZB_FALSE);
-        }
-        else
-        {
-            print_error(shell, "Failed to parse PAN ID", ZB_FALSE);
-            return -EINVAL;
-        }
-    }
-    else
-    {
-        print_error(shell, "Unsupported format. Expected panid <h:id>", ZB_FALSE);
-        return -EINVAL;
-    }
+		if (parse_hex_u16(argv[1], &pan_id)) {
+			ZB_PIBCACHE_PAN_ID() = pan_id;
+			print_done(shell, ZB_FALSE);
+		} else {
+			print_error(shell, "Failed to parse PAN ID", ZB_FALSE);
+			return -EINVAL;
+		}
+	} else {
+		print_error(shell, "Unsupported format. Expected panid <h:id>",
+			    ZB_FALSE);
+		return -EINVAL;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**@brief Set or get 802.15.4 channel.
@@ -257,11 +267,13 @@ static int cmd_zb_panid(const struct shell *shell, size_t argc, char **argv)
  *
  *  @pre Setting only before @ref start "bdb start".
  *
- * If the optional argument is not provided, get the current number and bitmask of the channel.
+ * If the optional argument is not provided, get the current number
+ * and bitmask of the channel.
  *
  * If the optional argument is provided:
  *   - If `n` is in [11:26] range, set to that channel.
- *   - Otherwise, treat `n` as bitmask (logical or of a single bit shifted by channel number).
+ *   - Otherwise, treat `n` as bitmask (logical or of a single bit shifted
+ *     by channel number).
  *
  *
  * Example:
@@ -273,80 +285,71 @@ static int cmd_zb_panid(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
 {
-    u32_t chan[2];
-    u32_t channel_number = 0;
-    u32_t channel_mask = 0;
+	u32_t chan[2];
+	u32_t channel_number = 0;
+	u32_t channel_mask = 0;
 
-    if (argc == 1)
-    {
-        int i;
-        int c;
+	if (argc == 1) {
+		int i;
+		int c;
 
-        chan[0] = zb_get_bdb_primary_channel_set();
-        chan[1] = zb_get_bdb_secondary_channel_set();
+		chan[0] = zb_get_bdb_primary_channel_set();
+		chan[1] = zb_get_bdb_secondary_channel_set();
 
-        /* Print for both channels. */
-        for (c = 0; c < 2; c++)
-        {
-            shell_fprintf(shell, SHELL_NORMAL, "%s channel(s):", c == 0 ? "Primary" : "Secondary");
-            for (i = 11; i <= 26; i++)
-            {
-                if ((1 << i) & chan[c])
-                {
-                    shell_fprintf(shell, SHELL_NORMAL, " %d", i);
-                }
-            }
-            shell_print(shell, "");
-        }
+		/* Print for both channels. */
+		for (c = 0; c < 2; c++) {
+			shell_fprintf(shell, SHELL_NORMAL, "%s channel(s):",
+				      c == 0 ? "Primary" : "Secondary");
+			for (i = 11; i <= 26; i++) {
+				if ((1 << i) & chan[c]) {
+					shell_fprintf(shell, SHELL_NORMAL,
+						      " %d", i);
+				}
+			}
+			shell_print(shell, "");
+		}
 
-        print_done(shell, ZB_FALSE);
-        return 0;
-    }
-    else if (argc == 2)
-    {
-        if (m_stack_is_started)
-        {
-            print_error(shell, "Stack already started", ZB_FALSE);
-            return -ENOEXEC;
-        }
+		print_done(shell, ZB_FALSE);
+		return 0;
+	} else if (argc == 2) {
+		if (m_stack_is_started) {
+			print_error(shell, "Stack already started", ZB_FALSE);
+			return -ENOEXEC;
+		}
 
-        sscan_uint(argv[1], (u8_t*)&channel_number, 4, 10);
-        if (channel_number < 11 || channel_number > 26)
-        {
-            /* Treat as a bitmask. */
-            channel_number = 0;
-            sscan_uint(argv[1], (u8_t*)&channel_mask, 4, 16);
-            if ((!(channel_mask & 0x7FFF800)) || (channel_mask & (~0x7FFF800)))
-            {
-                print_error(shell, "Bitmask invalid", ZB_FALSE);
-                return -EINVAL;
-            }
-        }
-        else
-        {
-            /* Treat as number. */
-            channel_mask = 1 << channel_number;
-        }
+		sscan_uint(argv[1], (u8_t*)&channel_number, 4, 10);
+		if (channel_number < 11 || channel_number > 26) {
+			/* Treat as a bitmask. */
+			channel_number = 0;
+			sscan_uint(argv[1], (u8_t*)&channel_mask, 4, 16);
+			if ((!(channel_mask & 0x7FFF800)) ||
+			    (channel_mask & (~0x7FFF800))) {
+				print_error(shell, "Bitmask invalid", ZB_FALSE);
+				return -EINVAL;
+			}
+		} else {
+			/* Treat as number. */
+			channel_mask = 1 << channel_number;
+		}
 
-        if (zb_get_bdb_primary_channel_set() != channel_mask)
-        {
-            if (channel_number)
-            {
-                shell_print(shell, "Setting channel to %d", channel_number);
-            }
-            else
-            {
-                shell_print(shell, "Setting channel bitmask to %x", channel_mask);
-            }
+		if (zb_get_bdb_primary_channel_set() != channel_mask) {
+			if (channel_number) {
+				shell_print(shell, "Setting channel to %d",
+					    channel_number);
+			} else {
+				shell_print(shell,
+					    "Setting channel bitmask to %x",
+					    channel_mask);
+			}
 
-            zb_set_bdb_primary_channel_set(channel_mask);
-            zb_set_bdb_secondary_channel_set(channel_mask);
-            zb_set_channel_mask(channel_mask);
-        }
+			zb_set_bdb_primary_channel_set(channel_mask);
+			zb_set_bdb_secondary_channel_set(channel_mask);
+			zb_set_channel_mask(channel_mask);
+		}
 
-        print_done(shell, ZB_FALSE);
-    }
-    return 0;
+		print_done(shell, ZB_FALSE);
+	}
+	return 0;
 }
 
 
@@ -364,7 +367,9 @@ static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
  *
  * <tt>bdb ic set</tt> must only be used on a joining device.
  *
- * <tt>bdb ic add</tt> must only be used on a coordinator. For <tt><h:eui64></tt>, use the address of the joining device.
+ * <tt>bdb ic add</tt> must only be used on a coordinator.
+ *                     For <tt><h:eui64></tt>, use the address
+ *                     of the joining device.
  *
  * <tt>bdb ic policy</tt> must only be used on a coordinator.
  *
@@ -380,85 +385,69 @@ static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static int cmd_zb_install_code(const struct shell *shell, size_t argc, char **argv)
+static int cmd_zb_install_code(const struct shell *shell, size_t argc,
+			       char **argv)
 {
-    const char *   p_err_msg = NULL;
-    zb_ieee_addr_t addr;
-    zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2]; /* +2 for CRC16. */
+	const char *   p_err_msg = NULL;
+	zb_ieee_addr_t addr;
+	zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2]; /* +2 for CRC16. */
 
-    if ((argc == 2) && (strcmp(argv[0], "set") == 0))
-    {
-        if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic), false))
-        {
-            p_err_msg = "Failed to parse IC";
-            goto exit;
-        }
+	if ((argc == 2) && (strcmp(argv[0], "set") == 0)) {
+		if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic),
+				   false)) {
+			p_err_msg = "Failed to parse IC";
+			goto exit;
+		}
 
-        if (zb_secur_ic_set(ZB_IC_TYPE_128, ic) != RET_OK)
-        {
-            p_err_msg = "Failed to set IC";
-            goto exit;
-        }
-    }
-    else if ((argc == 3) && (strcmp(argv[0], "add") == 0))
-    {
-        /* Check if stack is initialized as Install Code can not be added until production config is initialised. */
-        if (!m_stack_is_started)
-        {
-            print_error(shell, "Stack not started", ZB_FALSE);
-            return -ENOEXEC;
-        }
+		if (zb_secur_ic_set(ZB_IC_TYPE_128, ic) != RET_OK) {
+			p_err_msg = "Failed to set IC";
+			goto exit;
+		}
+	} else if ((argc == 3) && (strcmp(argv[0], "add") == 0)) {
+		/* Check if stack is initialized as Install Code can not
+		 * be added until production config is initialised.
+		 */
+		if (!m_stack_is_started) {
+			print_error(shell, "Stack not started", ZB_FALSE);
+			return -ENOEXEC;
+		}
 
-        if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic), false))
-        {
-            p_err_msg = "Failed to parse IC";
-            goto exit;
-        }
+		if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic),
+				   false)) {
+			p_err_msg = "Failed to parse IC";
+			goto exit;
+		}
 
-        if (!parse_long_address(argv[2], addr))
-        {
-            p_err_msg = "Failed to parse eui64";
-            goto exit;
-        }
+		if (!parse_long_address(argv[2], addr)) {
+			p_err_msg = "Failed to parse eui64";
+			goto exit;
+		}
 
-        if (zb_secur_ic_add(addr, ZB_IC_TYPE_128, ic) != RET_OK)
-        {
-            p_err_msg = "Failed to add IC";
-            goto exit;
-        }
-    }
-    else if ((argc == 2) && (strcmp(argv[0], "policy") == 0))
-    {
-        if (strcmp(argv[1], "enable") == 0)
-        {
-            zb_set_installcode_policy(ZB_TRUE);
-        }
-        else if (strcmp(argv[1], "disable") == 0)
-        {
-            zb_set_installcode_policy(ZB_FALSE);
-        }
-        else
-        {
-            p_err_msg = "Syntax error";
-            goto exit;
-        }
-    }
-    else
-    {
-        p_err_msg = "Syntax error";
-    }
+		if (zb_secur_ic_add(addr, ZB_IC_TYPE_128, ic) != RET_OK) {
+			p_err_msg = "Failed to add IC";
+			goto exit;
+		}
+	} else if ((argc == 2) && (strcmp(argv[0], "policy") == 0)) {
+		if (strcmp(argv[1], "enable") == 0) {
+			zb_set_installcode_policy(ZB_TRUE);
+		} else if (strcmp(argv[1], "disable") == 0) {
+			zb_set_installcode_policy(ZB_FALSE);
+		} else {
+			p_err_msg = "Syntax error";
+			goto exit;
+		}
+	} else {
+		p_err_msg = "Syntax error";
+	}
 
 exit:
-    if (p_err_msg)
-    {
-        print_error(shell, p_err_msg, ZB_FALSE);
-        return -EINVAL;
-    }
-    else
-    {
-        print_done(shell, ZB_FALSE);
-        return 0;
-    }
+	if (p_err_msg) {
+		print_error(shell, p_err_msg, ZB_FALSE);
+		return -EINVAL;
+	} else {
+		print_done(shell, ZB_FALSE);
+		return 0;
+	}
 }
 
 /**@brief Enable or disable the legacy device support.
@@ -479,37 +468,28 @@ exit:
  */
 static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
 {
-    if (!m_stack_is_started)
-    {
-        print_error(shell, "Stack not started", ZB_FALSE);
-        return -ENOEXEC;
-    }
+	if (!m_stack_is_started) {
+		print_error(shell, "Stack not started", ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    if (argc == 1)
-    {
-        shell_print(shell, "%s", m_legacy_mode ? "on" : "off");
-    }
-    else if (argc == 2)
-    {
-        if (strcmp(argv[1], "enable") == 0)
-        {
-            zb_bdb_set_legacy_device_support(1);
-            m_legacy_mode = ZB_TRUE;
-        }
-        else if (strcmp(argv[1], "disable") == 0)
-        {
-            zb_bdb_set_legacy_device_support(0);
-            m_legacy_mode = ZB_FALSE;
-        }
-        else
-        {
-            print_error(shell, "Unrecognized option", ZB_FALSE);
-            return -EINVAL;
-        }
-    }
+	if (argc == 1) {
+		shell_print(shell, "%s", m_legacy_mode ? "on" : "off");
+	} else if (argc == 2) {
+		if (strcmp(argv[1], "enable") == 0) {
+			zb_bdb_set_legacy_device_support(1);
+			m_legacy_mode = ZB_TRUE;
+		} else if (strcmp(argv[1], "disable") == 0) {
+			zb_bdb_set_legacy_device_support(0);
+			m_legacy_mode = ZB_FALSE;
+		} else {
+			print_error(shell, "Unrecognized option", ZB_FALSE);
+			return -EINVAL;
+		}
+	}
 
-    print_done(shell, ZB_FALSE);
-    return 0;
+	print_done(shell, ZB_FALSE);
+	return 0;
 }
 
 /**@brief Set network key.
@@ -530,25 +510,21 @@ static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_zb_nwkkey(const struct shell *shell, size_t argc, char **argv)
 {
-    if (m_stack_is_started)
-    {
-        print_error(shell, "Stack already started", ZB_FALSE);
-        return -ENOEXEC;
-    }
+	if (m_stack_is_started) {
+		print_error(shell, "Stack already started", ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    zb_uint8_t key[ZB_CCM_KEY_SIZE];
-    if (parse_hex_str(argv[1], strlen(argv[1]), key, sizeof(key), false))
-    {
-        zb_secur_setup_nwk_key(key, 0);
-    }
-    else
-    {
-        print_error(shell, "Failed to parse key", ZB_FALSE);
-        return -EINVAL;
-    }
+	zb_uint8_t key[ZB_CCM_KEY_SIZE];
+	if (parse_hex_str(argv[1], strlen(argv[1]), key, sizeof(key), false)) {
+		zb_secur_setup_nwk_key(key, 0);
+	} else {
+		print_error(shell, "Failed to parse key", ZB_FALSE);
+		return -EINVAL;
+	}
 
-    print_done(shell, ZB_FALSE);
-    return 0;
+	print_done(shell, ZB_FALSE);
+	return 0;
 }
 
 /**@brief Perform a factory reset via local action
@@ -560,11 +536,12 @@ static int cmd_zb_nwkkey(const struct shell *shell, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static int cmd_zb_factory_reset(const struct shell *shell, size_t argc, char **argv)
+static int cmd_zb_factory_reset(const struct shell *shell, size_t argc,
+				char **argv)
 {
-    zb_bdb_reset_via_local_action(0U);
-    print_done(shell, ZB_FALSE);
-    return 0;
+	zb_bdb_reset_via_local_action(0U);
+	print_done(shell, ZB_FALSE);
+	return 0;
 }
 
 /**@brief Set amount of the child devices which can be connected to the device.
@@ -575,8 +552,8 @@ static int cmd_zb_factory_reset(const struct shell *shell, size_t argc, char **a
  *
  *  @pre Setting only before @ref start "bdb start".
  *
- * If the argument is provided and `children_nbr` is in [0:32] range, set to that number.
- * Otherwise, return error.
+ * If the argument is provided and `children_nbr` is in [0:32] range,
+ * set to that number. Otherwise, return error.
  *
  *
  * Example:
@@ -588,123 +565,53 @@ static int cmd_zb_factory_reset(const struct shell *shell, size_t argc, char **a
  */
 static int cmd_child_max(const struct shell *shell, size_t argc, char **argv)
 {
-    u32_t child_max = 0xFFFFFFFF;
+	u32_t child_max = 0xFFFFFFFF;
 
-    /* Two argc - set the amount of the max_children. */
-    if (m_stack_is_started)
-    {
-        print_error(shell, "Stack already started", ZB_FALSE);
-        return -ENOEXEC;
-    }
+	/* Two argc - set the amount of the max_children. */
+	if (m_stack_is_started) {
+		print_error(shell, "Stack already started", ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    sscan_uint(argv[1], (u8_t*)&child_max, 4, 10);
-    if (child_max > 32) {
-        print_error(shell, "Children device number must be within [0:32]", ZB_FALSE);
-        return -EINVAL;
-    }
-    else
-    {
-        /* Set the value by calling ZBOSS API. */
-        zb_set_max_children(child_max);
-        shell_print(shell, "Setting max children to: %d", child_max);
-    }
+	sscan_uint(argv[1], (u8_t*)&child_max, 4, 10);
+	if (child_max > 32) {
+		print_error(shell,
+			    "Children device number must be within [0:32]",
+			    ZB_FALSE);
+		return -EINVAL;
+	} else {
+		/* Set the value by calling ZBOSS API. */
+		zb_set_max_children(child_max);
+		shell_print(shell, "Setting max children to: %d", child_max);
+	}
 
-    print_done(shell, ZB_FALSE);
-    return 0;
+	print_done(shell, ZB_FALSE);
+	return 0;
 }
 
 zb_bool_t zb_cli_is_stack_started(void)
 {
-    return m_stack_is_started;
+	return m_stack_is_started;
 }
 
-// BDB START
-// "start - start top level commissioning"
-
-// BDB channel
-// "channel - get the channel number\r\n"
-// "channel <d:channel> - set the channel to <n>\r\n"
-// "If n is [11:26], set to that channel. Otherwise, treat n as bitmask.");
-
-// BDB IC
-// "ic - set or add install code. Enable IC policy.\r\n"
-// "ic set <h:install_code> - set the ic code to <install_code>\r\n"
-// "ic add <h:install_code> <h:eui64> - add ic for device with given eui64\r\n"
-// "ic policy - set Trust Center install code policy");
-
-// BDB legacy
-// "enable - allow for legacy (pre ZB 3.0 devices)\r\n"
-// "disable - disallow for legacy devices");
-
-// BDB nwkkey
-// "<h:key>"
-
-// BDB Factory reset
-// "factory_reset - Perform factory reset"
-
-// BDB child max
-// "child_max <d:children_nbr> - set the amount of child devices to <children_nbr>\r\n"
-// "If n is [0:32], set to that number. Otherwise, return error.");
-
-#define IC_ADD_HELP \
-    ("Add install code for device with given eui64.\n" \
-    "Usage: add <h:install_code> <h:eui64>")
-
-#define IC_POLICY_HELP \
-    ("Set Trust Center install code policy.\n" \
-    "Usage: policy <enable|disable>")
-
-#define IC_SET_POLICY \
-    ("Add install code for device with given eui64.\n" \
-    "Usage: add <h:install_code> <h:eui64>")
-
-#define CHANNEL_HELP \
-    ("Set/get channel.\n" \
-    "Usage: channel [<n>]\n" \
-    "If n is [11:26], set to that channel. Otherwise, treat n as bitmask.")
-
-#define CHILD_MAX_HELP \
-    ("Set max_child number.\n" \
-    "Usage: child_max <d:children_nbr>")
-
-#define EXTPANID_HELP \
-    ("Set/get extpanid.\n" \
-    "Usage: extpanid [<h:id>]")
-
-#define LEGACY_HELP \
-    ("Get/enable/disable legacy mode.\n" \
-    "Usage: legacy [<enable|disable>]")
-
-#define NWKKEY_HELP \
-    ("Set network key.\n" \
-    "Usage: nwkkey <h:key>")
-
-#define PANID_HELP \
-    ("Set/get panid. \n" \
-    "Usage: panid [<h:id>]")
-
-#define ROLE_HELP \
-    ("Set/get role.\n" \
-    "Usage: role [<role>]")
-
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_ic,
-    SHELL_CMD_ARG(add, NULL, IC_ADD_HELP, cmd_zb_install_code, 3, 0),
-    SHELL_CMD_ARG(policy, NULL, IC_POLICY_HELP, cmd_zb_install_code, 2, 0),
-    SHELL_CMD_ARG(set, NULL, IC_SET_POLICY, cmd_zb_install_code, 2, 0),
-    SHELL_SUBCMD_SET_END);
+	SHELL_CMD_ARG(add, NULL, IC_ADD_HELP, cmd_zb_install_code, 3, 0),
+	SHELL_CMD_ARG(policy, NULL, IC_POLICY_HELP, cmd_zb_install_code, 2, 0),
+	SHELL_CMD_ARG(set, NULL, IC_SET_POLICY, cmd_zb_install_code, 2, 0),
+	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_bdb,
-    SHELL_CMD_ARG(channel, NULL, CHANNEL_HELP, cmd_zb_channel, 1, 1),
-    SHELL_CMD_ARG(child_max, NULL, CHILD_MAX_HELP, cmd_child_max, 2, 0),
-    SHELL_CMD_ARG(extpanid, NULL, EXTPANID_HELP, cmd_zb_extpanid, 1, 1),
-    SHELL_CMD_ARG(factory_reset, NULL, "Perform factory reset.",
-                  cmd_zb_factory_reset, 1, 0),
-    SHELL_CMD(ic, &sub_ic, "Install code manipulation.", NULL),
-    SHELL_CMD_ARG(legacy, NULL, LEGACY_HELP, cmd_zb_legacy, 1, 1),
-    SHELL_CMD_ARG(nwkkey, NULL, NWKKEY_HELP, cmd_zb_nwkkey, 2, 0),
-    SHELL_CMD_ARG(panid, NULL, PANID_HELP, cmd_zb_panid, 1, 1),
-    SHELL_CMD_ARG(role, NULL, ROLE_HELP, cmd_zb_role, 1, 1),
-    SHELL_CMD_ARG(start, NULL, "Start commissionning", cmd_zb_start, 1, 0),
-    SHELL_SUBCMD_SET_END);
+	SHELL_CMD_ARG(channel, NULL, CHANNEL_HELP, cmd_zb_channel, 1, 1),
+	SHELL_CMD_ARG(child_max, NULL, CHILD_MAX_HELP, cmd_child_max, 2, 0),
+	SHELL_CMD_ARG(extpanid, NULL, EXTPANID_HELP, cmd_zb_extpanid, 1, 1),
+	SHELL_CMD_ARG(factory_reset, NULL, "Perform factory reset.",
+				  cmd_zb_factory_reset, 1, 0),
+	SHELL_CMD(ic, &sub_ic, "Install code manipulation.", NULL),
+	SHELL_CMD_ARG(legacy, NULL, LEGACY_HELP, cmd_zb_legacy, 1, 1),
+	SHELL_CMD_ARG(nwkkey, NULL, NWKKEY_HELP, cmd_zb_nwkkey, 2, 0),
+	SHELL_CMD_ARG(panid, NULL, PANID_HELP, cmd_zb_panid, 1, 1),
+	SHELL_CMD_ARG(role, NULL, ROLE_HELP, cmd_zb_role, 1, 1),
+	SHELL_CMD_ARG(start, NULL, "Start commissionning", cmd_zb_start, 1, 0),
+	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(bdb, &sub_bdb, "Base device behaviour manipulation", NULL);
