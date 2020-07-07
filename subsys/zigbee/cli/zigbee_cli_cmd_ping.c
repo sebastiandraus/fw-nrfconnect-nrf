@@ -363,17 +363,17 @@ static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_us,
 		break;
 
 	case PING_EVT_FRAME_TIMEOUT:
-		shell_error(p_request->shell, "\r\nError: Request timed out after %ld ms.\r\n", delay_us/1000);
+		shell_error(p_request->shell, "Error: Request timed out after %ld ms.", delay_us/1000);
 		break;
 
 	case PING_EVT_ECHO_RECEIVED:
-		shell_print(p_request->shell, "\r\nPing time: %ld ms\r\n", delay_us/1000);
+		shell_print(p_request->shell, "Ping time: %ld ms", delay_us/1000);
 		print_done(p_request->shell, ZB_FALSE);
 		break;
 
 	case PING_EVT_ACK_RECEIVED:
 		if (p_request->request_echo == 0) {
-			shell_print(p_request->shell, "\r\nPing time: %ld ms\r\n", delay_us/1000);
+			shell_print(p_request->shell, "Ping time: %ld ms", delay_us/1000);
 			print_done(p_request->shell, ZB_FALSE);
 		}
 		break;
@@ -733,7 +733,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 	} else {
 #ifndef DEVELOPMENT_TODO
 #error "NRF LOG AGAIN!"
-		NRF_LOG_INST_WARNING(m_log.p_log, "Unsupported Ping message received, cmd_id %d\r\n", p_cmd_info->cmd_id);
+		NRF_LOG_INST_WARNING(m_log.p_log, "Unsupported Ping message received, cmd_id %d	", p_cmd_info->cmd_id);
 #endif
 	}
 
@@ -850,7 +850,7 @@ int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	if (p_row->count > PING_MAX_LENGTH) {
-		shell_print(shell, "Note: Ping payload size exceeds maximum possible, assuming maximum\r\n");
+		shell_print(shell, "Note: Ping payload size exceeds maximum possible, assuming maximum");
 		p_row->count = PING_MAX_LENGTH;
 	}
 
