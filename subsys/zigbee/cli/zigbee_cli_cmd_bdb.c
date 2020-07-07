@@ -1,23 +1,22 @@
-/*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
-#include "nrf_cli.h"
-#include "zboss_api.h"
-#include "zb_error_handler.h"
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <string.h>
+#include <shell/shell.h>
+
+#include <zboss_api.h>
+#include <zb_error_handler.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
-
-/**
- * @defgroup zb_cli_cmd_bdb BDB commands
- * @ingroup zb_cli
- *
- * @{
- */
 
 static zb_nwk_device_type_t m_default_role      = ZB_NWK_DEVICE_TYPE_ROUTER;
 static zb_bool_t            m_stack_is_started  = ZB_FALSE;
 static zb_bool_t            m_legacy_mode       = ZB_FALSE;
 
-/**
- * @brief Set or get Zigbee role of the device.
+/**@brief Set or get Zigbee role of the device.
  *
  * @code
  * bdb role [<role>]
@@ -37,15 +36,9 @@ static zb_bool_t            m_legacy_mode       = ZB_FALSE;
  * @note Zigbee End Device is not currently supported on the CLI Agent.
  *
  */
-static void cmd_zb_role(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
 {
     zb_nwk_device_type_t role;
-
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
 
     if (argc == 1)
     {
@@ -57,52 +50,47 @@ static void cmd_zb_role(nrf_cli_t const * p_cli, size_t argc, char **argv)
 
         if (role == ZB_NWK_DEVICE_TYPE_COORDINATOR)
         {
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "zc");
+            shell_print(shell, "zc");
         }
         else if (role == ZB_NWK_DEVICE_TYPE_ROUTER)
         {
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "zr");
+            shell_print(shell, "zr");
         }
         else if (role == ZB_NWK_DEVICE_TYPE_ED)
         {
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "zed");
+            shell_print(shell, "zed");
         }
     }
     else if (argc == 2)
     {
         if (m_stack_is_started)
         {
-            print_error(p_cli, "Stack already started", ZB_FALSE);
-            return;
+            print_error(shell, "Stack already started", ZB_FALSE);
+            return -ENOEXEC;
         }
 
         if (!strcmp(argv[1], "zc"))
         {
             m_default_role = ZB_NWK_DEVICE_TYPE_COORDINATOR;
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Coordinator set");
+            shell_print(shell, "Coordinator set");
         }
         else if (!strcmp(argv[1], "zr"))
         {
             m_default_role = ZB_NWK_DEVICE_TYPE_ROUTER;
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Router role set");
+            shell_print(shell, "Router role set");
         }
         else
         {
-            print_error(p_cli, "Role unsupported", ZB_FALSE);
-            return;
+            print_error(shell, "Role unsupported", ZB_FALSE);
+            return -ENOEXEC;
         }
     }
-    else
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
 
-    print_done(p_cli, ZB_TRUE);
+    print_done(shell, ZB_FALSE);
+    return 0;
 }
 
-/**
- * @brief Start bdb top level commissioning process.
+/**@brief Start bdb top level commissioning process.
  *
  * This command can be called multiple times. If device is not on a network
  * then it will attempt to join or form (depending on the role).
@@ -118,17 +106,11 @@ static void cmd_zb_role(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
 {
-    uint32_t   channel;
+    u32_t      channel;
     zb_bool_t  ret;
     zb_uint8_t mode_mask = ZB_BDB_NETWORK_STEERING;
-
-    if (nrf_cli_help_requested(p_cli))
-    {
-        print_usage(p_cli, argv[0], "start - start top level commissioning");
-        return;
-    }
 
     if (m_stack_is_started == ZB_FALSE)
     {
@@ -138,17 +120,17 @@ static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
         {
             case ZB_NWK_DEVICE_TYPE_ROUTER:
                 zb_set_network_router_role(channel);
-                nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Started router\r\n");
+                shell_print(shell, "Started router");
                 break;
 
             case ZB_NWK_DEVICE_TYPE_COORDINATOR:
                 zb_set_network_coordinator_role(channel);
-                nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Started coordinator\r\n");
+                shell_print(shell, "Started coordinator");
                 break;
 
             default:
-                print_error(p_cli, "Role unsupported", ZB_FALSE);
-                return;
+                print_error(shell, "Role unsupported", ZB_FALSE);
+                return -ENOEXEC;
         }
 
         if (zboss_start_no_autostart() == RET_OK)
@@ -168,11 +150,13 @@ static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
     if (ret)
     {
         m_stack_is_started = ZB_TRUE;
-        print_done(p_cli, ZB_FALSE);
+        print_done(shell, ZB_FALSE);
+        return 0;
     }
     else
     {
-        print_error(p_cli, "Could not start top level commissioning", ZB_FALSE);
+        print_error(shell, "Could not start top level commissioning", ZB_FALSE);
+        return -ENOEXEC;
     }
 }
 
@@ -190,32 +174,36 @@ static void cmd_zb_start(nrf_cli_t const * p_cli, size_t argc, char **argv)
  *
  *
  */
-static void cmd_zb_extpanid(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
 {
     zb_ext_pan_id_t extpanid;
 
     if (argc == 1)
     {
         zb_get_extended_pan_id(extpanid);
-        print_eui64(p_cli, extpanid);
-        print_done(p_cli, ZB_TRUE);
+        print_eui64(shell, extpanid);
+        print_done(shell, ZB_FALSE);
     }
     else if (argc == 2)
     {
         if (parse_long_address(argv[1], extpanid))
         {
             zb_set_extended_pan_id(extpanid);
-            print_done(p_cli, ZB_FALSE);
+            print_done(shell, ZB_FALSE);
         }
         else
         {
-            print_error(p_cli, "Failed to parse extpanid", ZB_FALSE);
+            print_error(shell, "Failed to parse extpanid", ZB_FALSE);
+            return -EINVAL;
         }
     }
     else
     {
-        print_error(p_cli, "Unsupported format. Expected extpanid <extpanid>", ZB_FALSE);
+        print_error(shell, "Unsupported format. Expected extpanid <extpanid>", ZB_FALSE);
+        return -EINVAL;
     }
+
+    return 0;
 }
 
 /**@brief Set or get the Zigbee Pan ID value.
@@ -230,12 +218,12 @@ static void cmd_zb_extpanid(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * If the optional argument is provided, sets the PAN ID to `id`.
  *
  */
-static void cmd_zb_panid(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_panid(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc == 1)
     {
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "%0x", ZB_PIBCACHE_PAN_ID());
-        print_done(p_cli, ZB_TRUE);
+        shell_print(shell, "%0x", ZB_PIBCACHE_PAN_ID());
+        print_done(shell, ZB_FALSE);
     }
     else if (argc == 2)
     {
@@ -244,20 +232,24 @@ static void cmd_zb_panid(nrf_cli_t const * p_cli, size_t argc, char **argv)
         if (parse_hex_u16(argv[1], &pan_id))
         {
             ZB_PIBCACHE_PAN_ID() = pan_id;
-            print_done(p_cli, ZB_FALSE);
+            print_done(shell, ZB_FALSE);
         }
         else
         {
-            print_error(p_cli, "Failed to parse PAN ID", ZB_FALSE);
+            print_error(shell, "Failed to parse PAN ID", ZB_FALSE);
+            return -EINVAL;
         }
     }
     else
     {
-        print_error(p_cli, "Unsupported format. Expected panid <h:id>", ZB_FALSE);
+        print_error(shell, "Unsupported format. Expected panid <h:id>", ZB_FALSE);
+        return -EINVAL;
     }
+
+    return 0;
 }
 
-/** @brief Set or get 802.15.4 channel.
+/**@brief Set or get 802.15.4 channel.
  *
  * @code
  * bdb channel <n>
@@ -279,20 +271,11 @@ static void cmd_zb_panid(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static void cmd_zb_channel(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
 {
-    uint32_t chan[2];
-    uint32_t channel_number;
-    uint32_t channel_mask;
-
-    if (nrf_cli_help_requested(p_cli))
-    {
-        print_usage(p_cli, argv[0],
-                    "channel - get the channel number\r\n"
-                    "channel <d:channel> - set the channel to <n>\r\n"
-                    "If n is [11:26], set to that channel. Otherwise, treat n as bitmask.");
-        return;
-    }
+    u32_t chan[2];
+    u32_t channel_number = 0;
+    u32_t channel_mask = 0;
 
     if (argc == 1)
     {
@@ -302,47 +285,46 @@ static void cmd_zb_channel(nrf_cli_t const * p_cli, size_t argc, char **argv)
         chan[0] = zb_get_bdb_primary_channel_set();
         chan[1] = zb_get_bdb_secondary_channel_set();
 
-        // Print for both channels
+        /* Print for both channels. */
         for (c = 0; c < 2; c++)
         {
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "%s channel(s):", c == 0 ? "Primary" : "Secondary");
+            shell_fprintf(shell, SHELL_NORMAL, "%s channel(s):", c == 0 ? "Primary" : "Secondary");
             for (i = 11; i <= 26; i++)
             {
                 if ((1 << i) & chan[c])
                 {
-                    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, " %d", i);
+                    shell_fprintf(shell, SHELL_NORMAL, " %d", i);
                 }
             }
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "\r\n");
+            shell_print(shell, "");
         }
-        
-        print_done(p_cli, ZB_FALSE);
-        return;
+
+        print_done(shell, ZB_FALSE);
+        return 0;
     }
     else if (argc == 2)
     {
         if (m_stack_is_started)
         {
-            print_error(p_cli, "Stack already started", ZB_FALSE);
-            return;
+            print_error(shell, "Stack already started", ZB_FALSE);
+            return -ENOEXEC;
         }
 
-        sscanf(argv[1], "%ld", &channel_number);
+        sscan_uint(argv[1], (u8_t*)&channel_number, 4, 10);
         if (channel_number < 11 || channel_number > 26)
         {
-            // Treat as a bitmask
+            /* Treat as a bitmask. */
             channel_number = 0;
-            sscanf(argv[1], "%lx", &channel_mask);
-
+            sscan_uint(argv[1], (u8_t*)&channel_mask, 4, 16);
             if ((!(channel_mask & 0x7FFF800)) || (channel_mask & (~0x7FFF800)))
             {
-                print_error(p_cli, "Bitmask invalid", ZB_FALSE);
-                return;
+                print_error(shell, "Bitmask invalid", ZB_FALSE);
+                return -EINVAL;
             }
         }
         else
         {
-            // Treat as number
+            /* Treat as number. */
             channel_mask = 1 << channel_number;
         }
 
@@ -350,11 +332,11 @@ static void cmd_zb_channel(nrf_cli_t const * p_cli, size_t argc, char **argv)
         {
             if (channel_number)
             {
-                nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Setting channel to %d\r\n", channel_number);
+                shell_print(shell, "Setting channel to %d", channel_number);
             }
             else
             {
-                nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Setting channel bitmask to %x\r\n", channel_mask);
+                shell_print(shell, "Setting channel bitmask to %x", channel_mask);
             }
 
             zb_set_bdb_primary_channel_set(channel_mask);
@@ -362,16 +344,13 @@ static void cmd_zb_channel(nrf_cli_t const * p_cli, size_t argc, char **argv)
             zb_set_channel_mask(channel_mask);
         }
 
-        print_done(p_cli, ZB_FALSE);
+        print_done(shell, ZB_FALSE);
     }
-    else
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-    }
+    return 0;
 }
 
 
-/** @brief Set install code on the device, add information about the install code
+/**@brief Set install code on the device, add information about the install code
  *  on the trust center, set the trust center install code policy.
  *
  * @code
@@ -382,7 +361,7 @@ static void cmd_zb_channel(nrf_cli_t const * p_cli, size_t argc, char **argv)
  *
  * @pre Setting and defining policy only before @ref start "bdb start".
  * Adding only after @ref start "bdb start".
- * 
+ *
  * <tt>bdb ic set</tt> must only be used on a joining device.
  *
  * <tt>bdb ic add</tt> must only be used on a coordinator. For <tt><h:eui64></tt>, use the address of the joining device.
@@ -401,21 +380,11 @@ static void cmd_zb_channel(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static void cmd_zb_install_code(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_install_code(const struct shell *shell, size_t argc, char **argv)
 {
     const char *   p_err_msg = NULL;
     zb_ieee_addr_t addr;
-    zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2]; // +2 for CRC16
-
-    if (nrf_cli_help_requested(p_cli) || (argc == 1))
-    {
-        print_usage(p_cli, argv[0],
-                    "ic - set or add install code. Enable IC policy.\r\n"
-                    "ic set <h:install code> - set the ic code to <install_code>\r\n"
-                    "ic add <h:install code> <h:eui64> - add ic for device with given eui64\r\n"
-                    "ic policy - set Trust Center install code policy");
-        return;
-    }
+    zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2]; /* +2 for CRC16. */
 
     if ((argc == 2) && (strcmp(argv[0], "set") == 0))
     {
@@ -433,11 +402,11 @@ static void cmd_zb_install_code(nrf_cli_t const * p_cli, size_t argc, char **arg
     }
     else if ((argc == 3) && (strcmp(argv[0], "add") == 0))
     {
-        /* Check if stack is initialized as Install Code can not be added until production config is initialised.*/
+        /* Check if stack is initialized as Install Code can not be added until production config is initialised. */
         if (!m_stack_is_started)
         {
-            print_error(p_cli, "Stack not started", ZB_FALSE);
-            return;
+            print_error(shell, "Stack not started", ZB_FALSE);
+            return -ENOEXEC;
         }
 
         if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic), false))
@@ -476,21 +445,23 @@ static void cmd_zb_install_code(nrf_cli_t const * p_cli, size_t argc, char **arg
     }
     else
     {
-        p_err_msg ="Syntax error";
+        p_err_msg = "Syntax error";
     }
 
 exit:
     if (p_err_msg)
     {
-        print_error(p_cli, p_err_msg, ZB_FALSE);
+        print_error(shell, p_err_msg, ZB_FALSE);
+        return -EINVAL;
     }
     else
     {
-        print_done(p_cli, ZB_FALSE);
+        print_done(shell, ZB_FALSE);
+        return 0;
     }
 }
 
-/** @brief Enable or disable the legacy device support.
+/**@brief Enable or disable the legacy device support.
  *
  * @code
  * bdb legacy <enable|disable>
@@ -506,25 +477,17 @@ exit:
  * Done
  * @endcode
  */
-static void cmd_zb_legacy(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
 {
-    if (nrf_cli_help_requested(p_cli))
-    {
-        print_usage(p_cli, argv[0],
-                    "enable - allow for legacy (pre ZB 3.0 devices)\r\n"
-                    "disable - disallow for legacy devices");
-        return;
-    }
-
     if (!m_stack_is_started)
     {
-        print_error(p_cli, "Stack not started", ZB_FALSE);
-        return;
+        print_error(shell, "Stack not started", ZB_FALSE);
+        return -ENOEXEC;
     }
 
     if (argc == 1)
     {
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "%s\r\n", m_legacy_mode ? "on" : "off");
+        shell_print(shell, "%s", m_legacy_mode ? "on" : "off");
     }
     else if (argc == 2)
     {
@@ -540,20 +503,16 @@ static void cmd_zb_legacy(nrf_cli_t const * p_cli, size_t argc, char **argv)
         }
         else
         {
-            print_error(p_cli, "Unrecognized option", ZB_FALSE);
-            return;
+            print_error(shell, "Unrecognized option", ZB_FALSE);
+            return -EINVAL;
         }
     }
-    else
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
 
-    print_done(p_cli, ZB_FALSE);
+    print_done(shell, ZB_FALSE);
+    return 0;
 }
 
-/** @brief Set network key.
+/**@brief Set network key.
  *
  * @code
  * bdb nwkkey <h:key>>
@@ -569,45 +528,30 @@ static void cmd_zb_legacy(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static void cmd_zb_nwkkey(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_nwkkey(const struct shell *shell, size_t argc, char **argv)
 {
-    if (nrf_cli_help_requested(p_cli))
-    {
-        print_usage(p_cli, argv[0],
-                    "<h:key>");
-        return;
-    }
-
     if (m_stack_is_started)
     {
-        print_error(p_cli, "Stack already started", ZB_FALSE);
-        return;
+        print_error(shell, "Stack already started", ZB_FALSE);
+        return -ENOEXEC;
     }
 
-    if (argc == 2)
+    zb_uint8_t key[ZB_CCM_KEY_SIZE];
+    if (parse_hex_str(argv[1], strlen(argv[1]), key, sizeof(key), false))
     {
-        zb_uint8_t key[ZB_CCM_KEY_SIZE];
-        if (parse_hex_str(argv[1], strlen(argv[1]), key, sizeof(key), false))
-        {
-            zb_secur_setup_nwk_key(key, 0);
-        }
-        else
-        {
-            print_error(p_cli, "Failed to parse key", ZB_FALSE);
-            return;
-        }
+        zb_secur_setup_nwk_key(key, 0);
     }
     else
     {
-        print_error(p_cli, "Syntax error", ZB_FALSE);
-        return;
+        print_error(shell, "Failed to parse key", ZB_FALSE);
+        return -EINVAL;
     }
 
-    print_done(p_cli, ZB_FALSE);
+    print_done(shell, ZB_FALSE);
+    return 0;
 }
 
-/**
- * @brief Perform a factory reset via local action
+/**@brief Perform a factory reset via local action
  *
  * See Base Device Behavior specification chapter 9.5 for details.
  *
@@ -616,19 +560,14 @@ static void cmd_zb_nwkkey(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * Done
  * @endcode
  */
-static void cmd_zb_factory_reset(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_factory_reset(const struct shell *shell, size_t argc, char **argv)
 {
-    if (nrf_cli_help_requested(p_cli))
-    {
-        print_usage(p_cli, argv[0], "factory_reset - Perform factory reset");
-        return;
-    }
-
     zb_bdb_reset_via_local_action(0U);
-    print_done(p_cli, ZB_FALSE);
+    print_done(shell, ZB_FALSE);
+    return 0;
 }
 
-/** @brief Set amount of the child devices which can be connected to the device.
+/**@brief Set amount of the child devices which can be connected to the device.
  *
  * @code
  * bdb child_max <d:children_nbr>
@@ -647,46 +586,31 @@ static void cmd_zb_factory_reset(nrf_cli_t const * p_cli, size_t argc, char **ar
  * Done
  * @endcode
  */
-static void cmd_child_max(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_child_max(const struct shell *shell, size_t argc, char **argv)
 {
-    uint32_t child_max = 0xFFFFFFFF;
+    u32_t child_max = 0xFFFFFFFF;
 
-    if (nrf_cli_help_requested(p_cli))
+    /* Two argc - set the amount of the max_children. */
+    if (m_stack_is_started)
     {
-        print_usage(p_cli, argv[0],
-                    "child_max <d:children_nbr> - set the amount of child devices to <children_nbr>\r\n"
-                    "If n is [0:32], set to that number. Otherwise, return error.");
-        return;
+        print_error(shell, "Stack already started", ZB_FALSE);
+        return -ENOEXEC;
     }
 
-    /* Two argc - set the amount of the max_children */
-    if (argc == 2)
-    {
-        if (m_stack_is_started)
-        {
-            print_error(p_cli, "Stack already started", ZB_FALSE);
-            return;
-        }
-
-        sscanf(argv[1], "%ld", &child_max);
-        if (child_max > 32)
-        {
-            print_error(p_cli, "Children device number must be within [0:32]", ZB_FALSE);
-            return;
-        }
-        else
-        {
-            /* Set the value by calling ZBOSS API */
-            zb_set_max_children(child_max);
-            nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Setting max children to: %d", child_max);
-        }
-
-        print_done(p_cli, ZB_TRUE);
+    sscan_uint(argv[1], (u8_t*)&child_max, 4, 10);
+    if (child_max > 32) {
+        print_error(shell, "Children device number must be within [0:32]", ZB_FALSE);
+        return -EINVAL;
     }
     else
     {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
+        /* Set the value by calling ZBOSS API. */
+        zb_set_max_children(child_max);
+        shell_print(shell, "Setting max children to: %d", child_max);
     }
+
+    print_done(shell, ZB_FALSE);
+    return 0;
 }
 
 zb_bool_t zb_cli_is_stack_started(void)
@@ -694,29 +618,51 @@ zb_bool_t zb_cli_is_stack_started(void)
     return m_stack_is_started;
 }
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_ic)
-{
-    NRF_CLI_CMD(add, NULL, "add install code", cmd_zb_install_code),
-    NRF_CLI_CMD(set, NULL, "set install code", cmd_zb_install_code),
-    NRF_CLI_CMD(policy, NULL, "set TC install code policy", cmd_zb_install_code),
-    NRF_CLI_SUBCMD_SET_END
-};
+// BDB START
+// "start - start top level commissioning"
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_bdb)
-{
-    NRF_CLI_CMD(role, NULL, "role get/set", cmd_zb_role),
-    NRF_CLI_CMD(extpanid, NULL, "extpanid get/set", cmd_zb_extpanid),
-    NRF_CLI_CMD(panid, NULL, "panid get/set", cmd_zb_panid),
-    NRF_CLI_CMD(start, NULL, "start commissionning", cmd_zb_start),
-    NRF_CLI_CMD(channel, NULL, "channel get/set", cmd_zb_channel),
-    NRF_CLI_CMD(ic, &m_sub_ic, "install code manipulation", NULL),
-    NRF_CLI_CMD(legacy, NULL, "legacy mode enable/disable", cmd_zb_legacy),
-    NRF_CLI_CMD(nwkkey, NULL, "network key set", cmd_zb_nwkkey),
-    NRF_CLI_CMD(factory_reset, NULL, "factory reset", cmd_zb_factory_reset),
-    NRF_CLI_CMD(child_max, NULL, "max_child set", cmd_child_max),
-    NRF_CLI_SUBCMD_SET_END
-};
+// BDB channel
+// "channel - get the channel number\r\n"
+// "channel <d:channel> - set the channel to <n>\r\n"
+// "If n is [11:26], set to that channel. Otherwise, treat n as bitmask.");
 
-NRF_CLI_CMD_REGISTER(bdb, &m_sub_bdb, "base device behaviour manipulation", NULL);
+// BDB IC
+// "ic - set or add install code. Enable IC policy.\r\n"
+// "ic set <h:install code> - set the ic code to <install_code>\r\n"
+// "ic add <h:install code> <h:eui64> - add ic for device with given eui64\r\n"
+// "ic policy - set Trust Center install code policy");
 
-/** @} */
+// BDB legacy
+// "enable - allow for legacy (pre ZB 3.0 devices)\r\n"
+// "disable - disallow for legacy devices");
+
+// BDB nwkkey
+// "<h:key>"
+
+// BDB Factory reset
+// "factory_reset - Perform factory reset"
+
+// BDB child max
+// "child_max <d:children_nbr> - set the amount of child devices to <children_nbr>\r\n"
+// "If n is [0:32], set to that number. Otherwise, return error.");
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_ic,
+    SHELL_CMD_ARG(add, NULL, "Adds install code", cmd_zb_install_code, 3, 0),
+    SHELL_CMD_ARG(policy, NULL, "Sets TC install code policy", cmd_zb_install_code, 2, 0),
+    SHELL_CMD_ARG(set, NULL, "Sets install code", cmd_zb_install_code, 2, 0),
+    SHELL_SUBCMD_SET_END);
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_bdb,
+    SHELL_CMD_ARG(channel, NULL, "channel get/set", cmd_zb_channel, 1, 1),
+    SHELL_CMD_ARG(child_max, NULL, "max_child set", cmd_child_max, 2, 0),
+    SHELL_CMD_ARG(extpanid, NULL, "extpanid get/set", cmd_zb_extpanid, 1, 1),
+    SHELL_CMD_ARG(factory_reset, NULL, "factory reset", cmd_zb_factory_reset, 1, 0),
+    SHELL_CMD(ic, &sub_ic, "install code manipulation", NULL),
+    SHELL_CMD_ARG(legacy, NULL, "legacy mode enable/disable", cmd_zb_legacy, 1, 1),
+    SHELL_CMD_ARG(nwkkey, NULL, "network key set", cmd_zb_nwkkey, 2, 0),
+    SHELL_CMD_ARG(panid, NULL, "panid get/set", cmd_zb_panid, 1, 1),
+    SHELL_CMD_ARG(role, NULL, "role get/set", cmd_zb_role, 1, 1),
+    SHELL_CMD(start, NULL, "start commissionning", cmd_zb_start),
+    SHELL_SUBCMD_SET_END);
+
+SHELL_CMD_REGISTER(bdb, &sub_bdb, "base device behaviour manipulation", NULL);
