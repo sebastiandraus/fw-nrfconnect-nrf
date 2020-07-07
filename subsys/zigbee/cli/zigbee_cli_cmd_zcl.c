@@ -42,6 +42,18 @@
 	("Send ping command over ZCL.\n" \
 	"Usage: ping [--no-echo] [--aps-ack] <h:addr> <d:payload size>")
 
+#define CMD_HELP \
+	("Send generic ZCL command.\n" \
+	"Usage: cmd [-d] <h:eui64> <d:ep> <h:cluster> [-p h:profile]" \
+		" <h:cmd_ID> [-l h:payload]\n" \
+	"-d - Require default response.\n" \
+	"-p - Set profile ID, HA profile by default.\n" \
+	"-l - Send payload in command, Little Endian bytes order.")
+
+#define RAW_HELP \
+	("Send raw ZCL frame.\n" \
+	"Usage: raw <h:eui64> <d:ep> <h:cluster> <h:profile> <h:raw_data>")
+
 /**@brief Command set array
  */
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_attr,
@@ -56,20 +68,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_subsbcribe,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_zcl,
 	SHELL_CMD(attr, &sub_attr, "Read/write an attribute.", NULL),
+	SHELL_CMD_ARG(cmd, NULL, CMD_HELP, cmd_zb_generic_cmd, 5, 10),
 	SHELL_CMD_ARG(ping, NULL, PING_HELP, cmd_zb_ping, 3, 2),
+	SHELL_COND_CMD_ARG(CONFIG_ZIGBEE_SHELL_DEBUG_CMD, raw, NULL, RAW_HELP,
+			   cmd_zb_zcl_raw, 6, 0),
 	SHELL_CMD(subscribe, &sub_subsbcribe, SUBSCRIBE_HELP, NULL),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(zcl, &sub_zcl, "ZCL subsystem commands.", NULL);
-
-// NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_zcl)
-// {
-//     NRF_CLI_CMD(attr, &m_sub_attr, "read/write attribute", NULL),
-//     NRF_CLI_CMD(ping, NULL, "ping over ZCL", cmd_zb_ping),
-//     NRF_CLI_CMD(subscribe, &m_sub_subscribe, "(un)subscribe to an attribute", NULL),
-//     NRF_CLI_CMD(cmd, NULL, "send generic command", cmd_zb_generic_cmd),
-// #ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
-//     NRF_CLI_CMD(raw, NULL, "send raw ZCL frame", cmd_zb_zcl_raw),
-// #endif
-//     NRF_CLI_SUBCMD_SET_END
-// };

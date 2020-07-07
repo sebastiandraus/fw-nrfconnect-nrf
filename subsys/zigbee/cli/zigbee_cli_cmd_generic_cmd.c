@@ -1,21 +1,25 @@
-/*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
-#include "nrf_cli.h"
-#include "zboss_api.h"
-#include "zb_error_handler.h"
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+
+#include <errno.h>
+#include <shell/shell.h>
+
+#include <zboss_api.h>
+#include <zb_error_handler.h>
+#include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
-
-/**
- * @defgroup zb_cli_cmd_zcl ZCL commands
- * @ingroup zb_cli
- *
- * @{
- */
 
 /* Payload size in bytes, payload read from string is twice the size. */
 #define CMD_PAYLOAD_SIZE    25
 #define CMD_TABLE_SIZE      20
 #define CMD_ROW_TIMEOUT_S   10
+
+LOG_MODULE_DECLARE(cli);
 
 /* Structure to store command's parameters to send. */
 typedef struct cmd_query_s
@@ -31,7 +35,7 @@ typedef struct cmd_query_s
     zb_uint8_t                          payload_length;
     zb_uint16_t                         cmd_id;
     zb_zcl_disable_default_response_t   def_resp;
-    nrf_cli_t const                   * p_cli;
+    const struct shell                  *shell;
 } cmd_query_t;
 
 /* Array of structures to store command parameters. */
@@ -92,7 +96,7 @@ static zb_void_t invalidate_row(zb_uint8_t row)
  */
 static zb_void_t invalidate_row_cb(zb_uint8_t row)
 {
-    print_error(m_cmd_data[row].p_cli, "Request timed out", ZB_FALSE);
+    print_error(m_cmd_data[row].shell, "Request timed out", ZB_FALSE);
     invalidate_row(row);
 }
 
@@ -160,13 +164,13 @@ static zb_void_t generic_cmd_send(zb_bufid_t bufid, zb_uint16_t cb_param)
     zb_ret_t      zb_err_code;
     cmd_query_t * p_cmd_query = &m_cmd_data[cb_param];
 
-    /* Start filling buffer with packet data */
+    /* Start filling buffer with packet data. */
     p_cmd_query->seq_num = ZCL_CTX().seq_number;
     zb_uint8_t* ptr = ZB_ZCL_START_PACKET_REQ(bufid)
     ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL(ptr, (p_cmd_query->def_resp))
     ZB_ZCL_CONSTRUCT_COMMAND_HEADER_REQ(ptr, ZB_ZCL_GET_SEQ_NUM(), p_cmd_query->cmd_id);
 
-    /* Scan argument with payload and put in buffer with command to send */
+    /* Scan argument with payload and put in buffer with command to send. */
     for (zb_uint8_t i = 0; i < p_cmd_query->payload_length; i++)
     {
         ZB_ZCL_PACKET_PUT_DATA8(ptr, (p_cmd_query->payload[i]));
@@ -182,21 +186,21 @@ static zb_void_t generic_cmd_send(zb_bufid_t bufid, zb_uint16_t cb_param)
                               p_cmd_query->cluster_id,
                               NULL);
 
-    /* If default response is requested, schedule an alarm */
+    /* If default response is requested, schedule an alarm. */
     if (p_cmd_query->def_resp == ZB_ZCL_ENABLE_DEFAULT_RESPONSE)
     {
         zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, cb_param,
                                             CMD_ROW_TIMEOUT_S * ZB_TIME_ONE_SECOND);
-        /* If no free buffer, print error and invalidate buffer to disble response from def_resp_cb */
+        /* If no free buffer, print error and invalidate buffer to disble response from def_resp_cb. */
         if (zb_err_code != RET_OK)
         {
-            print_error(p_cmd_query->p_cli, "No free buffer", ZB_FALSE);
+            print_error(p_cmd_query->shell, "No free buffer", ZB_FALSE);
             invalidate_row(cb_param);
         }
     }
     else
     {
-        print_done(p_cmd_query->p_cli, ZB_FALSE);
+        print_done(p_cmd_query->shell, ZB_FALSE);
         invalidate_row(cb_param);
     }
 }
@@ -211,10 +215,10 @@ static zb_void_t raw_zcl_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 {
     cmd_query_t * p_cmd_query = &m_cmd_data[cb_param];
 
-    /* Start filling buffer with packet data */
+    /* Start filling buffer with packet data. */
     zb_uint8_t * ptr = ZB_ZCL_START_PACKET(bufid);
 
-    /* Scan argument with payload and put in buffer with command to send */
+    /* Scan argument with payload and put in buffer with command to send . */
     for (zb_uint8_t i = 0; i < p_cmd_query->payload_length; i++)
     {
         ZB_ZCL_PACKET_PUT_DATA8(ptr, (p_cmd_query->payload[i]));
@@ -230,11 +234,10 @@ static zb_void_t raw_zcl_send(zb_bufid_t bufid, zb_uint16_t cb_param)
                               p_cmd_query->cluster_id,
                               NULL);
 
-    print_done(p_cmd_query->p_cli, ZB_FALSE);
+    print_done(p_cmd_query->shell, ZB_FALSE);
     invalidate_row(cb_param);
 }
 #endif
-
 
 /**@brief Send generic command to the remote node.
  *
@@ -251,7 +254,7 @@ static zb_void_t raw_zcl_send(zb_bufid_t bufid, zb_uint16_t cb_param)
  * @note To send via binding table, set `dst_addr` and `ep` to 0.
  *
  */
-void cmd_zb_generic_cmd(nrf_cli_t const * p_cli, size_t argc, char **argv)
+int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 {
     zb_ret_t        zb_err_code;
     zb_int8_t       table_row;
@@ -260,70 +263,27 @@ void cmd_zb_generic_cmd(nrf_cli_t const * p_cli, size_t argc, char **argv)
     int             ret_val;
     size_t          len;
 
-    /* Command options description */
-    static const nrf_cli_getopt_option_t opt[] = {
-        NRF_CLI_OPT(
-            "",
-            "-d",
-            "Require default response"
-        ),
-        NRF_CLI_OPT(
-            "",
-            "-p",
-            "Set profile ID, HA profile by default"
-        ),
-        NRF_CLI_OPT(
-            "",
-            "-l",
-            "Send payload in command, Little Endian bytes order "
-        )
-    };
-
-    /* Print usage/help if requested */
-    if (argc == 1)
-    {
-        print_usage(p_cli, argv[0],
-                    " [-d] <h:eui64> <d:ep> <h:cluster> [-p h:profile]"
-                    " <h:cmd_ID> [-l h:payload]\r\n");
-        return;
-    }
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, opt, ARRAY_SIZE(opt));
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
-                        " [-d] <h:dst_addr> <d:ep> <h:cluster> [-p h:profile] <h:cmd_ID> [-l h:payload]\r\n");
-        return;
-    }
-
     table_row = acquire_row_table();
     if (table_row < 0)
     {
-        print_error(p_cli, "No free buffer. Wait a bit", ZB_FALSE);
-        return;
+        print_error(shell, "No free buffer. Wait a bit", ZB_FALSE);
+        return -ENOEXEC;
     }
     p_cmd_data = &m_cmd_data[table_row];
 
-    /* Make sure that there is at least 4 arguments given and no more than 9 */
-    if ((argc < 5) || (argc > 10))
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        goto error;
-    }
-
-    /*  Set default command values */
+    /*  Set default command values. */
     p_cmd_data->def_resp         = ZB_ZCL_DISABLE_DEFAULT_RESPONSE;
     p_cmd_data->payload_length   = 0;
     p_cmd_data->profile_id       = ZB_AF_HA_PROFILE_ID;
 
-    /* Check if default response should be requested */
+    /* Check if default response should be requested. */
     if (strcmp(*p_arg, "-d") == 0)
     {
         p_cmd_data->def_resp = ZB_ZCL_ENABLE_DEFAULT_RESPONSE;
         p_arg++;
     }
 
-    /* Parse and check remote node address */
+    /* Parse and check remote node address. */
     p_cmd_data->remote_addr_mode = parse_address(*p_arg, &(p_cmd_data->remote_node), ADDR_ANY);
     if (p_cmd_data->remote_addr_mode == ADDR_INVALID)
     {
@@ -335,85 +295,88 @@ void cmd_zb_generic_cmd(nrf_cli_t const * p_cli, size_t argc, char **argv)
         }
         else
         {
-            print_error(p_cli, "Wrong address format", ZB_FALSE);
+            print_error(shell, "Wrong address format", ZB_FALSE);
             goto error;
         }
     }
     p_arg++;
 
-    /* Read endpoint and cluster id */
+    /* Read endpoint and cluster id. */
     ret_val = sscan_uint8(*(p_arg++), &(p_cmd_data->remote_ep));
     if (ret_val == 0)
     {
-        print_error(p_cli, "Remote ep value", ZB_FALSE);
+        print_error(shell, "Remote ep value", ZB_FALSE);
         goto error;
     }
 
     ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->cluster_id));
     if (ret_val == 0)
     {
-        print_error(p_cli, "Cluster id value", ZB_FALSE);
+        print_error(shell, "Cluster id value", ZB_FALSE);
         goto error;
     }
 
-    /* Check if different from HA profile should be used */
+    /* Check if different from HA profile should be used. */
     if (strcmp(*p_arg, "-p") == 0)
     {
         ret_val = parse_hex_u16(*(++p_arg), &(p_cmd_data->profile_id));
         if (ret_val == 0)
         {
-            print_error(p_cli, "Profile id value", ZB_FALSE);
+            print_error(shell, "Profile id value", ZB_FALSE);
             goto error;
         }
         p_arg++;
     }
 
-    /* Read command id */
+    /* Read command id. */
     ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->cmd_id));
     if (ret_val == 0)
     {
-        print_error(p_cli, "Cmd id value", ZB_FALSE);
+        print_error(shell, "Cmd id value", ZB_FALSE);
         goto error;
     }
 
-    /* Check if payload should be sent */
+    /* Check if payload should be sent. */
     if (strcmp(*(p_arg++), "-l") == 0)
     {
         len = strlen(*p_arg);
         if (len > (2 * CMD_PAYLOAD_SIZE))
         {
-            nrf_cli_fprintf(p_cli, NRF_CLI_WARNING, "Payload length is too big, trimming it to first %d bytes\n", CMD_PAYLOAD_SIZE);
+            shell_warn(shell, "Payload length is too big, trimming it to first %d bytes\n", CMD_PAYLOAD_SIZE);
             len = (2 * CMD_PAYLOAD_SIZE);
         }
         if ((len != 0) && (len % 2) != 0)
         {
-            print_error(p_cli, "Payload length is not even", ZB_FALSE);
+            print_error(shell, "Payload length is not even", ZB_FALSE);
             goto error;
         }
         ret_val = parse_hex_str(*p_arg, len, p_cmd_data->payload, CMD_PAYLOAD_SIZE, false);
         if (ret_val == 0)
         {
-            print_error(p_cli, "Payload value", ZB_FALSE);
+            print_error(shell, "Payload value", ZB_FALSE);
             goto error;
         }
         p_cmd_data->payload_length = len/2;
     }
 
-    /* Get buffer and send command */
-    p_cmd_data->p_cli = p_cli;
+    /* Get buffer and send command. */
+    p_cmd_data->shell = shell;
     zb_err_code = zb_buf_get_out_delayed_ext(generic_cmd_send, table_row, 0);
     if (zb_err_code != RET_OK)
     {
-        print_error(p_cli, "No frame left - wait a bit", ZB_FALSE);
+        print_error(shell, "No frame left - wait a bit", ZB_FALSE);
         /* Mark data structure as free. */
-        goto error;
+        invalidate_row(table_row);
+
+        return -ENOEXEC;
     }
-    return;
+    return 0;
 
     error:
+        /* Mark data structure as free. */
         invalidate_row(table_row);
+        return -EINVAL;
 }
-
 
 #ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Send raw ZCL frame.
@@ -427,9 +390,9 @@ void cmd_zb_generic_cmd(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * of the remote node `dst_addr`. The payload represents the ZCL Header plus ZCL Payload.
  *
  * @note To send via binding table, set `eui64` and `ep` to 0.
- * 
+ *
  */
-void cmd_zb_zcl_raw(nrf_cli_t const * p_cli, size_t argc, char **argv)
+int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 {
     zb_ret_t        zb_err_code;
     zb_int8_t       table_row;
@@ -441,46 +404,22 @@ void cmd_zb_zcl_raw(nrf_cli_t const * p_cli, size_t argc, char **argv)
     /* Debug mode quick return. */
     if (!zb_cli_debug_get())
     {
-        print_error(p_cli, "This command is available only in debug mode. Run 'debug on' to enable it", ZB_FALSE);
-        return;
-    }
-
-    /* Print usage/help if requested */
-    if (argc == 1)
-    {
-        print_usage(p_cli, argv[0],
-                    " <h:eui64> <d:ep> <h:cluster> <h:profile>"
-                    " <h:raw_data>\r\n");
-        return;
-    }
-
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Usage:\r\n");
-        nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
-                        " <h:eui64> <d:ep> <h:cluster> <h:profile> <h:raw_data>\r\n");
-        return;
+        print_error(shell, "This command is available only in debug mode. Run 'debug on' to enable it", ZB_FALSE);
+        return -ENOEXEC;
     }
 
     table_row = acquire_row_table();
     if (table_row < 0)
     {
-        print_error(p_cli, "No free buffer. Wait a bit", ZB_FALSE);
-        return;
+        print_error(shell, "No free buffer. Wait a bit", ZB_FALSE);
+        return -ENOEXEC;
     }
     p_cmd_data = &m_cmd_data[table_row];
 
-    /* Make sure that the exact number of arguments is given */
-    if (argc != 6)
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        goto error;
-    }
-
-    /*  Reset the counter */
+    /*  Reset the counter. */
     p_cmd_data->payload_length = 0;
 
-    /* Parse and check remote node address */
+    /* Parse and check remote node address. */
     p_cmd_data->remote_addr_mode = parse_address(*p_arg, &(p_cmd_data->remote_node), ADDR_ANY);
     if (p_cmd_data->remote_addr_mode == ADDR_INVALID)
     {
@@ -492,31 +431,31 @@ void cmd_zb_zcl_raw(nrf_cli_t const * p_cli, size_t argc, char **argv)
         }
         else
         {
-            print_error(p_cli, "Wrong EUI64 address format", ZB_FALSE);
+            print_error(shell, "Wrong EUI64 address format", ZB_FALSE);
             goto error;
         }
     }
     p_arg++;
 
-    /* Read endpoint and cluster id */
+    /* Read endpoint and cluster id. */
     ret_val = sscan_uint8(*(p_arg++), &(p_cmd_data->remote_ep));
     if (ret_val == 0)
     {
-        print_error(p_cli, "Remote ep value", ZB_FALSE);
+        print_error(shell, "Remote ep value", ZB_FALSE);
         goto error;
     }
 
     ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->cluster_id));
     if (ret_val == 0)
     {
-        print_error(p_cli, "Cluster id value", ZB_FALSE);
+        print_error(shell, "Cluster id value", ZB_FALSE);
         goto error;
     }
 
     ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->profile_id));
     if (ret_val == 0)
     {
-        print_error(p_cli, "Profile id value", ZB_FALSE);
+        print_error(shell, "Profile id value", ZB_FALSE);
         goto error;
     }
 
@@ -524,36 +463,39 @@ void cmd_zb_zcl_raw(nrf_cli_t const * p_cli, size_t argc, char **argv)
     len = strlen(*p_arg);
     if (len > (2 * CMD_PAYLOAD_SIZE))
     {
-        nrf_cli_fprintf(p_cli, NRF_CLI_WARNING, "Raw data length is too big, trimming it to first %d bytes\n", CMD_PAYLOAD_SIZE);
+        shell_warn(shell, "Raw data length is too big, trimming it to first %d bytes\n", CMD_PAYLOAD_SIZE);
         len = (2 * CMD_PAYLOAD_SIZE);
     }
 
     if ((len != 0) && (len % 2) != 0)
     {
-        print_error(p_cli, "Payload length is not even", ZB_FALSE);
+        print_error(shell, "Payload length is not even", ZB_FALSE);
         goto error;
     }
 
     ret_val = parse_hex_str(*p_arg, len, p_cmd_data->payload, CMD_PAYLOAD_SIZE, false);
     if (ret_val == 0)
     {
-        print_error(p_cli, "Payload value", ZB_FALSE);
+        print_error(shell, "Payload value", ZB_FALSE);
         goto error;
     }
     p_cmd_data->payload_length = len/2;
 
-    /* Get buffer and send command */
-    p_cmd_data->p_cli = p_cli;
+    /* Get buffer and send command. */
+    p_cmd_data->shell = shell;
     zb_err_code = zb_buf_get_out_delayed_ext(raw_zcl_send, table_row, 0);
     if (zb_err_code != RET_OK)
     {
-        print_error(p_cli, "No frame left - wait a bit", ZB_FALSE);
-        goto error;
+        print_error(shell, "No frame left - wait a bit", ZB_FALSE);
+        invalidate_row(table_row);
+
+        return -ENOEXEC;
     }
-    return;
+    return 0;
 
     error:
         invalidate_row(table_row);
+        return -EINVAL;
 }
 #endif /* CONFIG_ZIGBEE_SHELL_DEBUG_CMD */
 
@@ -568,7 +510,7 @@ static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
     zb_int8_t             row;
     zb_ret_t              zb_err_code;
 
-    /* Get the row in the requests table according by the sequence number */
+    /* Get the row in the requests table according by the sequence number. */
     row = get_cmd_table_row_by_sn(p_cmd_info->seq_number);
     if (row == -1)
     {
@@ -586,30 +528,33 @@ static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
         zb_zcl_default_resp_payload_t * p_def_resp;
         p_def_resp = ZB_ZCL_READ_DEFAULT_RESP(bufid);
 
-        /* Print info received from default response */
-        nrf_cli_fprintf(p_row->p_cli,
-                       (p_def_resp->status == ZB_ZCL_STATUS_SUCCESS) ? NRF_CLI_INFO : NRF_CLI_ERROR,
-                       "\r\nDefault Response received: ");
-        nrf_cli_fprintf(p_row->p_cli,
-                       (p_def_resp->status == ZB_ZCL_STATUS_SUCCESS) ? NRF_CLI_INFO : NRF_CLI_ERROR,
-                       "Command: %d, Status: %d",
-                        p_def_resp->command_id, p_def_resp->status);
-        nrf_cli_fprintf(p_row->p_cli,
-                       (p_def_resp->status == ZB_ZCL_STATUS_SUCCESS) ? NRF_CLI_INFO : NRF_CLI_ERROR,
-                       "\r\n");
+        /* Print info received from default response. */
+        shell_fprintf(p_row->shell,
+                      (p_def_resp->status == ZB_ZCL_STATUS_SUCCESS) ?
+                       SHELL_INFO : SHELL_ERROR,
+                      "\r\nDefault Response received: ");
+        shell_fprintf(p_row->shell,
+                      (p_def_resp->status == ZB_ZCL_STATUS_SUCCESS) ?
+                       SHELL_INFO : SHELL_ERROR,
+                      "Command: %d, Status: %d", p_def_resp->command_id,
+                      p_def_resp->status);
+        shell_fprintf(p_row->shell,
+                      (p_def_resp->status == ZB_ZCL_STATUS_SUCCESS) ?
+                       SHELL_INFO : SHELL_ERROR,
+                      "\r\n");
 
         if (p_def_resp->status != ZB_ZCL_STATUS_SUCCESS)
         {
-            print_error(p_row->p_cli, "Command not successful", ZB_TRUE);
+            print_error(p_row->shell, "Command not successful", ZB_FALSE);
         }
         else
         {
-            print_done(p_row->p_cli, ZB_FALSE);
+            print_done(p_row->shell, ZB_FALSE);
         }
     }
-    else /* In case of unknown response */
+    else /* In case of unknown response. */
     {
-        print_error(p_row->p_cli, "Unknown response", ZB_TRUE);
+        print_error(p_row->shell, "Unknown response", ZB_FALSE);
     }
     /* Cancel the ongoing alarm which was to erase the row... */
     if (m_cmd_data[row].def_resp == ZB_ZCL_ENABLE_DEFAULT_RESPONSE)
@@ -617,15 +562,75 @@ static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
         zb_err_code = (ZB_SCHEDULE_APP_ALARM_CANCEL(invalidate_row_cb, row));
         ZB_ERROR_CHECK(zb_err_code);
     }
-    /* ...and erase it manually */
+    /* ...and erase it manually. */
     invalidate_row(row);
 
     zb_buf_free(bufid);
     return ZB_TRUE;
 }
 
+// GENERIC CMD USAGE AND HELP
+    // /* Print usage/help if requested. */
+    // if (argc == 1)
+    // {
+    //     print_usage(shell, argv[0],
+    //                 " [-d] <h:eui64> <d:ep> <h:cluster> [-p h:profile]"
+    //                 " <h:cmd_ID> [-l h:payload]\r\n");
+    //     return;
+    // }
+    // if (nrf_cli_help_requested(shell))
+    // {
+    //     nrf_cli_help_print(shell, opt, ARRAY_SIZE(opt));
+    //     nrf_cli_fprintf(shell, NRF_CLI_NORMAL, "Usage:\r\n");
+    //     nrf_cli_fprintf(shell, NRF_CLI_NORMAL, "   %s %s\r\n", argv[0],
+    //                     " [-d] <h:dst_addr> <d:ep> <h:cluster> [-p h:profile] <h:cmd_ID> [-l h:payload]\r\n");
+    //     return;
+    // }
+//
 
+// GENERIC CMD OPTIONS
+//
+// /* Command options description. */
+//     static const nrf_cli_getopt_option_t opt[] = {
+//         NRF_CLI_OPT(
+//             "",
+//             "-d",
+//             "Require default response"
+//         ),
+//         NRF_CLI_OPT(
+//             "",
+//             "-p",
+//             "Set profile ID, HA profile by default"
+//         ),
+//         NRF_CLI_OPT(
+//             "",
+//             "-l",
+//             "Send payload in command, Little Endian bytes order "
+//         )
+//     };
+//
+
+
+// ZCL_RAW CMD HELP AND USAGE
+    // /* Print usage/help if requested. */
+    // if (argc == 1)
+    // {
+    //     print_usage(shell, argv[0],
+    //                 " <h:eui64> <d:ep> <h:cluster> <h:profile>"
+    //                 " <h:raw_data>\r\n");
+    //     return;
+    // }
+
+    // if (nrf_cli_help_requested(shell))
+    // {
+    //     shell_print(shell, "Usage:\r\n");
+    //     shell_print(shell, "   %s %s\r\n", argv[0], " <h:eui64> <d:ep> <h:cluster> <h:profile> <h:raw_data>\r\n");
+    //     return;
+    // }
+//
 /**@brief Endpoint handlers
  */
- NRF_ZIGBEE_EP_HANDLER_REGISTER(generic_cmd, cli_agent_ep_handler_generic_cmd);
-/** @} */
+#ifndef DEVELOPMENT_TODO
+#error "Endpoint handler problem here!"
+NRF_ZIGBEE_EP_HANDLER_REGISTER(generic_cmd, cli_agent_ep_handler_generic_cmd);
+#endif
