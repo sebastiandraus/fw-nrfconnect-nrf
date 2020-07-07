@@ -427,14 +427,12 @@ zb_void_t ping_request_send(ping_request_t * p_request)
 				dispatch_user_callback);
 		ZB_ERROR_CHECK(zb_err_code);
 	} else {
-#ifndef DEVELOPMENT_TODO
-#error "Lack of zb_zcl_finish_and_send_packet_no_ack, because of zb_zcl_common_addons.c & .h"
-		zb_zcl_finish_and_send_packet_no_ack(
-			bufid, p_cmd_buf, &(p_request->remote_addr),
-			p_request->remote_addr_mode, cli_ep, cli_ep,
-			ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
-			dispatch_user_callback);
-#endif
+		zb_err_code = zb_zcl_finish_and_send_packet_new(
+				bufid, p_cmd_buf, &(p_request->remote_addr),
+				p_request->remote_addr_mode, cli_ep, cli_ep,
+				ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
+				dispatch_user_callback, ZB_FALSE, ZB_TRUE, 0);
+		ZB_ERROR_CHECK(zb_err_code);
 	}
 
 	if (p_request->p_cb) {
@@ -485,15 +483,12 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 				PING_CUSTOM_CLUSTER, frame_acked_cb);
 		ZB_ERROR_CHECK(zb_err_code);
 	} else {
-#ifndef DEVELOPMENT_TODO
-#error "Lack of zb_zcl_finish_and_send_packet_no_ack, because of zb_zcl_common_addons.c & .h"
-		zb_zcl_finish_and_send_packet_no_ack(
-			bufid, p_cmd_buf,
-			(zb_addr_u *)(&(p_reply->remote_short_addr)),
-			ZB_APS_ADDR_MODE_16_ENDP_PRESENT, cli_ep, cli_ep,
-			ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
-			frame_acked_cb);
-#endif
+		zb_err_code = zb_zcl_finish_and_send_packet_new(
+				bufid, p_cmd_buf, (zb_addr_u *)(&(p_reply->remote_short_addr)),
+				ZB_APS_ADDR_MODE_16_ENDP_PRESENT, cli_ep, cli_ep,
+				ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
+				frame_acked_cb, ZB_FALSE, ZB_TRUE, 0);
+		ZB_ERROR_CHECK(zb_err_code);
 	}
 
 	/* We don't need the row in this table anymore,
