@@ -125,7 +125,7 @@ static void cmd_zb_subscribe_unsubscribe_timeout(u8_t tsn)
 		return;
 	}
 
-	print_error(p_tsn_ctx->shell, "Request timed out", ZB_TRUE);
+	print_error(p_tsn_ctx->shell, "Request timed out", ZB_FALSE);
 	invalidate_ctx(p_tsn_ctx);
 }
 

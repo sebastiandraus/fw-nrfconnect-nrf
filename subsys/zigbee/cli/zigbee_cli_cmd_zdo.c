@@ -287,7 +287,7 @@ static void cmd_zb_bind_unbind_timeout(zb_uint8_t tsn)
         return;
     }
 
-    print_error(p_tsn_ctx->p_cli, "Bind/unbind request timed out", ZB_TRUE);
+    print_error(p_tsn_ctx->p_cli, "Bind/unbind request timed out", ZB_FALSE);
     invalidate_ctx(p_tsn_ctx);
 }
 
@@ -345,7 +345,7 @@ static void cmd_zb_nwk_addr_timeout(zb_uint8_t tsn)
         return;
     }
 
-    print_error(p_tsn_ctx->p_cli, "Network address request timed out", ZB_TRUE);
+    print_error(p_tsn_ctx->p_cli, "Network address request timed out", ZB_FALSE);
     invalidate_ctx(p_tsn_ctx);
 }
 
@@ -410,7 +410,7 @@ static void cmd_zb_ieee_addr_timeout(zb_uint8_t tsn)
         return;
     }
 
-    print_error(p_tsn_ctx->p_cli, "IEEE address request timed out", ZB_TRUE);
+    print_error(p_tsn_ctx->p_cli, "IEEE address request timed out", ZB_FALSE);
     invalidate_ctx(p_tsn_ctx);
 }
 
@@ -1257,7 +1257,7 @@ static void cmd_zb_mgmt_leave_timeout_cb(zb_uint8_t tsn)
         return;
     }
 
-    print_error(p_tsn_ctx->p_cli, "mgmt_leave request timed out", ZB_TRUE);
+    print_error(p_tsn_ctx->p_cli, "mgmt_leave request timed out", ZB_FALSE);
 
     invalidate_ctx(p_tsn_ctx);
 }
