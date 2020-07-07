@@ -139,14 +139,45 @@ int sscan_uint8(const char * p_bp, u8_t * p_u8)
 	/* strtoul() used as a replacement for lacking sscanf(),
 	 * first character is tested to make sure that is a digit.
 	 */
-	unsigned long value = 0xFFFF;
-	value = strtoul(p_bp, NULL, 10);
+	char *p_end = NULL;
+	unsigned long value;
+	value = strtoul(p_bp, &p_end, 10);
 
-	if ((value > UINT8_MAX) || (p_bp[0] < '0') || (p_bp[0] > '9')) {
+	if (((value == 0) && (p_bp == p_end)) || (value > UINT8_MAX)) {
 		return 0;
 	}
 
 	*p_u8 = value & 0xFF;
+
+	return 1;
+}
+
+int sscan_uint(const char *p_bp, u8_t *p_value, u8_t size, u8_t base)
+{
+	char *p_end = NULL;
+	long unsigned int value;
+
+	value = strtoul(p_bp, &p_end, base);
+
+	/* Validation steps:
+	 *   - check if returned value is not zero - strtoul returns zero
+	 *     if failed to convert string.
+	 *   - check if p_end is not equal p_bp - p_end is set to point
+	 *     to the first character after the number or to p_pb
+	 *     if nothing is matched.
+	 *   - check if returned value can be stored in variable of length
+	 *     given by `size` argument.
+	 */
+	if ((value == 0) && (p_bp == p_end)) {
+		return 0;
+	}
+	if (size == 4) {
+		*((u32_t*)p_value) = value & ((1 << (size * 8)) - 1);
+	} else if (size == 2) {
+		*((u16_t*)p_value) = value & ((1 << (size * 8)) - 1);
+	} else {
+		*p_value = value & ((1 << (size * 8)) - 1);
+	}
 
 	return 1;
 }

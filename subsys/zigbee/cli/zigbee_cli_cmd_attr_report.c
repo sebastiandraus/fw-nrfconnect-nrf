@@ -368,9 +368,7 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	if (argc > 7) {
-		req.interval_min = strtoul(argv[7], NULL, 16);
-		if ((argv[7][0] == '0') && ((argv[7][1] == 'x') ||
-		    (argv[7][1] == 'X'))) {
+		if (!sscan_uint(argv[7], (u8_t*)&req.interval_min, 2, 10)) {
 			print_error(shell, "Incorrect minimum interval",
 				    ZB_FALSE);
 			return -EINVAL;
@@ -378,9 +376,7 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	if (argc > 8) {
-		req.interval_max = strtoul(argv[8], NULL, 16);
-		if ((argv[8][0] == '0') && ((argv[8][1] == 'x') ||
-		    (argv[8][1] == 'X'))) {
+		if (!sscan_uint(argv[8], (u8_t*)&req.interval_max, 2, 10)) {
 			print_error(shell, "Incorrect maximum interval",
 				    ZB_FALSE);
 			return -EINVAL;

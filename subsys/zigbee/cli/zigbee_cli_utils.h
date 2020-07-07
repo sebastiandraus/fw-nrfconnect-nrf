@@ -31,7 +31,8 @@
  */
 static inline void print_done(const struct shell *shell, bool prepend_newline)
 {
-	shell_print(shell, prepend_newline ? "\nDone" : "Done");
+	shell_fprintf(shell, SHELL_NORMAL,
+		      prepend_newline ? "\nDone\n" : "Done\n");
 }
 
 /**@brief Print error message to the console.
@@ -44,12 +45,12 @@ static inline void print_error(const struct shell *shell, const char *p_message,
 			       bool prepend_newline)
 {
 	if (p_message) {
-		shell_error(shell, prepend_newline ? "\nError: %s"
-			     : "Error: %s", p_message);
+		shell_fprintf(shell, SHELL_ERROR, prepend_newline ?
+			      "\nError: %s\n" : "Error: %s\n", p_message);
 	} else {
-		shell_error(shell, prepend_newline ?
-			     "\nError: Unknown error occurred" :
-			      "Error: Unknown error occurred");
+		shell_fprintf(shell, SHELL_ERROR, prepend_newline ?
+			      "\nError: Unknown error occurred\n" :
+			      "Error: Unknown error occurred\n");
 	}
 }
 
@@ -95,9 +96,26 @@ int zcl_attr_to_str(char *p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
  * @param[in]  p_bp Pointer to input string.
  * @param[out] p_u8 Pointer to output value.
  *
- * @return 1 on success, 0 otherwise
+ * @return 1 on success, 0 otherwise.
  */
 int sscan_uint8(const char * p_bp, u8_t * p_u8);
+
+/**@brief Parse unsigned integers from input string.
+ *
+ * The reason for this explicit function is because of lack
+ * of sscanf() function. This function is to be used to parse number
+ * up to (UINT32_MAX).
+ *
+ * @param[in]  p_bp    Pointer to input string.
+ * @param[out] p_value Pointer to variable to store reuslt of the function.
+ * @param[in]  size    Size, in bytes, that determines expected maximum value
+ *                     of converted number.
+ * @param[in]  base    Numerical base (radix) that determines the valid
+ *                     characters and their interpretation.
+ *
+ * @return 1 on success, 0 otherwise.
+ */
+int sscan_uint(const char *p_bp, u8_t *p_value, u8_t size, u8_t base);
 
 /**@brief Print buffer as hex string.
  *

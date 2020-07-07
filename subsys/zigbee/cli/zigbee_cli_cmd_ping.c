@@ -843,9 +843,7 @@ int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	p_row->count = strtol(argv[argc - 1], NULL, 10);
-	if ((argv[argc - 1][0] < '0') || (argv[argc - 1][0] > '9') ||
-	    (p_row->count > INT16_MAX)) {
+	if (!sscan_uint(argv[argc - 1], (u8_t*)&p_row->count, 2, 10)) {
 		print_error(shell, "Incorrect ping payload size", ZB_FALSE);
 		zb_ping_release_request(p_row);
 		return -EINVAL;
