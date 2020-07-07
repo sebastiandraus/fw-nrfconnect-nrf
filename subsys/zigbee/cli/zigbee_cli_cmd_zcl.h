@@ -12,9 +12,6 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv);
 int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv);
 int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv);
 int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv);
-
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv);
-#endif
 
 #endif /* ZIGBEE_CLI_CMD_ZCL_H__ */

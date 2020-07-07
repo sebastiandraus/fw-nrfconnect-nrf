@@ -191,7 +191,6 @@ static zb_void_t generic_cmd_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 	}
 }
 
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Construct the raw ZCL frame and send it.
  *
  * @param bufid     ZBOSS buffer to fill.
@@ -219,7 +218,6 @@ static zb_void_t raw_zcl_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 	print_done(p_cmd_query->shell, ZB_FALSE);
 	invalidate_row(cb_param);
 }
-#endif
 
 /**@brief Send generic command to the remote node.
  *
@@ -353,7 +351,6 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 		return -EINVAL;
 }
 
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Send raw ZCL frame.
  *
  * @code
@@ -467,8 +464,6 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 		invalidate_row(table_row);
 		return -EINVAL;
 }
-#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
-
 
 /**@brief The Handler to 'intercept' every frame coming to the endpoint
  *

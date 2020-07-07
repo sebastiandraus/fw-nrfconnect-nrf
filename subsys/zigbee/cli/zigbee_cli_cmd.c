@@ -65,7 +65,6 @@ static int cmd_reset(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Get state of debug mode in the CLI
  *
  * @code
@@ -83,9 +82,7 @@ static int cmd_debug(const struct shell *shell, size_t argc, char **argv)
 	print_done(shell, false);
 	return 0;
 }
-#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
 
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 /**@brief Enable debug mode in the shell
  *
  * @code
@@ -110,16 +107,13 @@ static int cmd_debug_on_off(const struct shell *shell, size_t argc, char **argv)
 	print_done(shell, false);
 	return 0;
 }
-#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
 
 SHELL_CMD_REGISTER(version, NULL, "Print firmware version", cmd_version);
 SHELL_CMD_REGISTER(reset, NULL, "Reset the board", cmd_reset);
 
-#ifdef CONFIG_ZIGBEE_SHELL_DEBUG_CMD
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
-	SHELL_CMD(on, NULL, DEBUG_ON_HELP, cmd_debug_on_off),
-	SHELL_CMD(off, NULL, DEBUG_OFF_HELP, cmd_debug_on_off),
+	SHELL_COND_CMD(CONFIG_ZIGBEE_SHELL_DEBUG_CMD, on, NULL, DEBUG_ON_HELP, cmd_debug_on_off),
+	SHELL_COND_CMD(CONFIG_ZIGBEE_SHELL_DEBUG_CMD, off, NULL, DEBUG_OFF_HELP, cmd_debug_on_off),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(debug, &sub_debug, DEBUG_HELP, cmd_debug);
-#endif /* defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) */
+SHELL_COND_CMD_REGISTER(CONFIG_ZIGBEE_SHELL_DEBUG_CMD, debug, &sub_debug, DEBUG_HELP, cmd_debug);

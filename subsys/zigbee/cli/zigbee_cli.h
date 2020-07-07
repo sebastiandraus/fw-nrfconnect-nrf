@@ -30,36 +30,27 @@ zb_void_t zb_set_cli_endpoint(zb_uint8_t ep);
  */
 zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid);
 
-#if defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD)
 /**@brief Function for setting the state of the debug mode of the CLI.
  *
  * @param debug    Turns the debug mode on (ZB_TRUE) or off (ZB_FALSE).
  */
 zb_void_t zb_cli_debug_set(zb_bool_t debug);
-#endif
 
-#if defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD)
 /**@brief Function for getting the state of the debug mode of the CLI.
  *
  * @retval ZB_TRUE  Debug mode is turned on.
  * @retval ZB_FALSE Debug mode is turned off.
  */
 zb_bool_t zb_cli_debug_get(zb_void_t);
-#endif
 
-#if defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD)
 /**@brief Function for suspending the processing of the Zigbee main loop.
  */
 zb_void_t zb_cli_suspend(zb_void_t);
-#endif
 
-#if defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD)
 /**@brief Function for resuming the processing of the Zigbee main loop.
  */
 zb_void_t zb_cli_resume(zb_void_t);
-#endif
 
-#if defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD)
 /**@brief Function for getting the state of the Zigbee scheduler
  *        processing suspension.
  *
@@ -67,7 +58,6 @@ zb_void_t zb_cli_resume(zb_void_t);
  * @retval ZB_FALSE Scheduler processing is not suspended.
  */
 zb_bool_t zb_cli_stack_is_suspended(zb_void_t);
-#endif
 
 /**@brief Function for checking if the Zigbee stack has been started
  *
