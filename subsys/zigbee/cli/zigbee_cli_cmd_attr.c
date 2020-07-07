@@ -91,7 +91,7 @@ static zb_void_t invalidate_row(zb_uint8_t row)
  */
 static zb_void_t invalidate_row_cb(zb_uint8_t row)
 {
-	print_error(m_attr_table[row].shell, "Request timed out", ZB_TRUE);
+	print_error(m_attr_table[row].shell, "Request timed out", ZB_FALSE);
 	invalidate_row(row);
 }
 
