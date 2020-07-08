@@ -22,7 +22,7 @@ void zb_cli_init(void);
  */
 void zb_set_cli_shell_prompt(const char *new_prompt);
 
-/**@brief Mark current shell command as processed by giving semaphor.
+/**@brief Mark current shell command as processed by giving semaphore.
  */
 void zb_cmd_processed(void);
 
@@ -36,7 +36,7 @@ void zb_cmd_processed(void);
  */
 void zb_cmd_wait_until_processed(k_timeout_t timeout);
 
-/**@brief Resets internal semaphor used to block processing shell
+/**@brief Resets internal semaphore used to block processing shell
  *        command handlers. Call at the beginning of command handler to make
  *        sure that processing can be block properly.
  */

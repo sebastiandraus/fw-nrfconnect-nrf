@@ -21,11 +21,13 @@ static zb_uint8_t cli_ep;
 APP_TIMER_DEF(m_timer_0);
 #endif
 
+/* Zigbee cli debug mode indicator. */
 static zb_bool_t m_debug_mode = ZB_FALSE;
 
 /* Zigbee stack processing suspension indicator. */
 static zb_bool_t m_suspended = ZB_FALSE;
 
+/* Semaphore used to block shell command handler processing. */
 static K_SEM_DEFINE(zb_cmd_processed_sem, 0, 1);
 
 LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
@@ -55,7 +57,7 @@ void zb_set_cli_shell_prompt(const char *new_prompt)
 #endif
 }
 
-/**@brief Mark current shell command as processed by giving semaphor.
+/**@brief Mark current shell command as processed by giving semaphore.
  */
 void zb_cmd_processed(void)
 {
@@ -75,7 +77,7 @@ void zb_cmd_wait_until_processed(k_timeout_t timeout)
 	k_sem_take(&zb_cmd_processed_sem, timeout);
 }
 
-/**@brief Resets internal semaphor used to block processing shell
+/**@brief Resets internal semaphore used to block processing shell
  *        command handlers. Call at the beginning of command handler to make
  *        sure that processing can be block properly.
  */
