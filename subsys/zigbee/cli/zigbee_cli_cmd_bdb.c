@@ -390,7 +390,8 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 {
 	const char *   p_err_msg = NULL;
 	zb_ieee_addr_t addr;
-	zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2]; /* +2 for CRC16. */
+	/* +2 for CRC16. */
+	zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2];
 
 	if ((argc == 2) && (strcmp(argv[0], "set") == 0)) {
 		if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic),
