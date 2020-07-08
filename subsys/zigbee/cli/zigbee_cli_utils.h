@@ -66,12 +66,13 @@ static inline void print_error(const struct shell *shell, const char *p_message,
  */
 #define PRINT_LIST(shell, hdr, fmt, type, ptr, size)                       \
 {                                                                          \
-	shell_print(shell, hdr);                                           \
+	shell_fprintf(shell, SHELL_NORMAL, hdr);                           \
 	for (type * p_item = (ptr); p_item < (ptr) + size - 1; p_item++) { \
-		shell_print(shell, fmt ",", *p_item);                      \
+		shell_fprintf(shell, SHELL_NORMAL, fmt ",", *p_item);      \
 		}                                                          \
 	if (size > 0) {                                                    \
-		shell_print(shell, fmt " ", *((ptr) + size - 1));          \
+		shell_fprintf(shell, SHELL_NORMAL, fmt " ",                \
+		              *((ptr) + size - 1));                        \
 	}                                                                  \
 }
 

@@ -193,8 +193,8 @@ void print_hexdump(const struct shell *shell, const u8_t * p_in, u8_t size,
 	bytes_written = to_hex_str(addr_buf, (u16_t)sizeof(addr_buf), p_in,
 				   size, reverse);
 	if (bytes_written < 0) {
-		shell_error(shell, "%s", "Unable to print hexdump");
+		shell_fprintf(shell, SHELL_ERROR, "%s", "Unable to print hexdump");
 	} else {
-		shell_print(shell, "%s", addr_buf);
+		shell_fprintf(shell, SHELL_NORMAL, "%s", addr_buf);
 	}
 }
