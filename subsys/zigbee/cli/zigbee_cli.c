@@ -30,6 +30,9 @@ static K_SEM_DEFINE(zb_cmd_processed_sem, 0, 1);
 
 LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
+
+/**@brief Function for cli shell initial configuration.
+ */
 void zb_cli_init(void)
 {
 #ifdef CONFIG_ZIGBEE_SHELL_PROMPT
@@ -37,6 +40,10 @@ void zb_cli_init(void)
 #endif
 }
 
+/**@brief Function for setting prompt for cli shell.
+ *
+ * @param[in] new_prompt  Pointer to new cli shell prompt.
+ */
 void zb_set_cli_shell_prompt(const char *new_prompt)
 {
 #ifdef CONFIG_SHELL_BACKEND_SERIAL
@@ -48,29 +55,43 @@ void zb_set_cli_shell_prompt(const char *new_prompt)
 #endif
 }
 
+/**@brief Mark current shell command as processed by giving semaphor.
+ */
 void zb_cmd_processed(void)
 {
 	k_sem_give(&zb_cmd_processed_sem);
 }
 
+/**@brief Blocks processing current shell command handler until all requested
+ *        actions are finished, for example when getting data from other devices
+ *        over Zigbee. Call `zb_cmd_processed()` when requested actions
+ *        are finished.
+ *
+ * @param[in] timeout Specifies time to wait for requested actions
+ *                    to be finished.
+ */
 void zb_cmd_wait_until_processed(k_timeout_t timeout)
 {
 	k_sem_take(&zb_cmd_processed_sem, timeout);
 }
 
+/**@brief Resets internal semaphor used to block processing shell
+ *        command handlers. Call at the beginning of command handler to make
+ *        sure that processing can be block properly.
+ */
 void zb_cmd_sem_reset(void)
 {
 	k_sem_reset(&zb_cmd_processed_sem);
 }
 
-/**@brief Returns the number of the Endpoint used by the CLI.
+/**@brief Returns the Endpoint number used by the CLI.
  */
 zb_uint8_t zb_get_cli_endpoint(void)
 {
 	return cli_ep;
 }
 
-/**@brief Sets the number of the Endpoint used by the CLI.
+/**@brief Sets the Endpoint number used by the CLI.
  */
 zb_void_t zb_set_cli_endpoint(zb_uint8_t ep)
 {
