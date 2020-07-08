@@ -27,6 +27,60 @@
 /* Defines how long to wait, in seconds, for mgmt_leave response. */
 #define ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT  5
 
+#define BIND_ON_HELP \
+    ("Create bind entry.\n" \
+    "Usage: on <h:source_eui64> <d:source_ep> <h:destination_addr> " \
+        "<d:destination_ep> <h:source_cluster_id> <h:request_dst_addr>")
+
+#define BIND_OFF_HELP \
+    ("Remove bind entry.\n" \
+    "Usage: off <h:source_eui64> <d:source_ep> <h:destination_addr> " \
+        "<d:destination_ep> <h:source_cluster_id> <h:request_dst_addr>")
+
+#define ACTIVE_EP_HELP \
+    ("Send active endpoint request.\n" \
+    "Usage: active_ep <h:16-bit destination_address>")
+
+#define SIMPLE_DESC_HELP \
+    ("Send simple descriptor request.\n" \
+    "Usage: simple_desc_req <h:16-bit destination_address> <d:endpoint>")
+
+#define MATCH_DESC_HELP \
+    ("Send match descriptor request.\n" \
+    "Usage: match_desc <h:16-bit destination_address> " \
+        "<h:requested address/type> <h:profile ID> " \
+        "<d:number of input clusters> [<h:input cluster IDs> ...] " \
+        "<d:number of output clusters> [<h:output cluster IDs> ...] " \
+        "[-t | --timeout d:number of seconds to wait for answers]")
+
+#define NWK_ADDR_HELP \
+    ("Resolve EUI64 address to short network address.\n" \
+    "Usage: nwk_addr <h:EUI64>")
+
+#define IEEE_ADDR_HELP \
+    ("Resolve network short address to EUI64 address.\n" \
+    "Usage: ieee_addr <h:short_addr>")
+
+#define EUI64_HELP \
+    ("Get/set the eui64 address of the node.\n" \
+    "Usage: eui64 [<h:eui64>]")
+
+#define MGMT_BIND_HELP \
+    ("Get binding table (see spec. 2.4.3.3.4)\n" \
+    "Usage: <h:short> [d:start_index]")
+
+#define MGMT_LEAVE_HELP \
+    ("Perform mgmt_leave_req (see spec. 2.4.3.3.5)\n" \
+    "Usage: mgmt_leave <h:16-bit dst_addr> [h:device_address eui64] " \
+        "[--children] [--rejoin]\n" \
+    "--children - Device should also remove its children when leaving.\n" \
+    "--rejoin - Device should rejoin network after leave.")
+
+#define MGMT_LQI_HELP \
+    ("Perform mgmt_lqi request.\n" \
+    "Usage: mgmt_lqi <h:short> [d:start index]")
+
+
 LOG_MODULE_DECLARE(cli);
 
 typedef struct {
@@ -463,7 +517,7 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
-        return;
+        return -ENOEXEC;
     }
 
     p_req = zb_buf_initial_alloc(bufid, sizeof(*p_req));
@@ -479,7 +533,8 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
     if (!p_tsn_cli)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
-        goto error;
+        zb_buf_free(bufid);
+        return -ENOEXEC;
     }
 
     p_tsn_cli->shell = shell;
@@ -489,13 +544,15 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send match descriptor request", ZB_FALSE);
-        goto error;
+        zb_buf_free(bufid);
+        return -ENOEXEC;
     }
 
-    return;
+    return 0;
 
 error:
     zb_buf_free(bufid);
+    return -EINVAL;
 }
 
 /**@brief Send Simple Descriptor Request.
@@ -526,7 +583,7 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc, char **arg
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
-        return;
+        return -ENOEXEC;
     }
 
     p_req = zb_buf_initial_alloc(bufid, sizeof(*p_req));
@@ -548,7 +605,8 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc, char **arg
     if (!p_tsn_cli)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
-        goto error;
+        zb_buf_free(bufid);
+        return -ENOEXEC;
     }
 
     p_tsn_cli->shell = shell;
@@ -557,13 +615,15 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc, char **arg
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send match descriptor request", ZB_FALSE);
-        goto error;
+        zb_buf_free(bufid);
+        return -ENOEXEC;
     }
 
-    return;
+    return 0;
 
 error:
     zb_buf_free(bufid);
+    return -EINVAL;
 }
 
 /**@brief Send match descriptor request.
@@ -605,6 +665,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     zb_uint16_t                 timeout = ZIGBEE_CLI_MATCH_DESC_RESP_TIMEOUT;
     int                         timeout_offset;
     zb_uint16_t                 temp;
+    int                         ret_err = 0;
 
     /* We use p_cluster_list for calls to ZBOSS API but we're not using
      * p_cluster_list value in any way.
@@ -614,14 +675,14 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!strcmp(argv[1], "-t") || !strcmp(argv[1], "--timeout"))
     {
         print_error(shell, "Place option 'timeout' at the end of input parameters", ZB_FALSE);
-        return;
+        return -EINVAL;
     }
 
     bufid = zb_buf_get_out();
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
-        return;
+        return -ENOEXEC;
     }
 
     p_req = zb_buf_initial_alloc(bufid, sizeof(*p_req));
@@ -629,6 +690,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!parse_hex_u16(argv[1], &temp))
     {
         print_error(shell, "Incorrect network address", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
     p_req->nwk_addr = temp;
@@ -636,6 +698,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!parse_hex_u16(argv[2], &temp))
     {
         print_error(shell, "Incorrect address of interest", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
     p_req->addr_of_interest = temp;
@@ -643,6 +706,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!parse_hex_u16(argv[3], &temp))
     {
         print_error(shell, "Incorrect profile id", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
     p_req->profile_id = temp;
@@ -655,6 +719,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!sscan_uint8(argv[4], &(p_req->num_in_clusters)))
     {
         print_error(shell, "Incorrect number of input clusters", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -672,6 +737,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
         if (!sscan_cluster_list(argv + 5, p_req->num_in_clusters, (u16_t *)p_req->cluster_list))
         {
             print_error(shell, "Failed to parse input cluster list", ZB_FALSE);
+            ret_err = -EINVAL;
             goto error;
         }
 
@@ -680,6 +746,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!sscan_uint8(argv[5 + p_req->num_in_clusters], &(p_req->num_out_clusters)))
     {
         print_error(shell, "Incorrect number of output clusters", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -692,6 +759,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
                                 (u16_t *)p_req->cluster_list + p_req->num_in_clusters))
         {
             print_error(shell, "Failed to parse output cluster list", ZB_FALSE);
+            ret_err = -EINVAL;
             goto error;
         }
     }
@@ -718,6 +786,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (!p_tsn_cli)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -729,6 +798,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send match descriptor request", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -750,10 +820,11 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc, char **argv
         }
     }
 
-    return;
+    return ret_err;
 
 error:
     zb_buf_free(bufid);
+    return ret_err;
 }
 
 /**@brief Create or remove a binding between two endpoints on two nodes.
@@ -782,6 +853,7 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
     zb_bufid_t                bufid;
     zb_ret_t                  zb_err_code;
     zb_bool_t                 bind;
+    int                       ret_err = 0;
 
     if (strcmp(argv[0], "on") == 0)
     {
@@ -796,7 +868,7 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
-        return;
+        return -ENOEXEC;
     }
 
     p_req = ZB_BUF_GET_PARAM(bufid, zb_zdo_bind_req_param_t);
@@ -804,12 +876,14 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
     if (!parse_long_address(argv[1], p_req->src_address))
     {
         print_error(shell, "Incorrect EUI64 source address format", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
     if (!sscan_uint8(argv[2], &(p_req->src_endp)))
     {
         print_error(shell, "Incorrect source endpoint", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -817,24 +891,28 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
     if (p_req->dst_addr_mode == ADDR_INVALID)
     {
         print_error(shell, "Incorrect destination address format", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
     if (!sscan_uint8(argv[4], &(p_req->dst_endp)))
     {
         print_error(shell, "Incorrect destination endpoint", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
     if (!parse_hex_u16(argv[5], &(p_req->cluster_id)))
     {
         print_error(shell, "Incorrect cluster ID", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
     if (!parse_short_address(argv[6], &(p_req->req_dst_addr)))
     {
         print_error(shell, "Incorrect destination network address for the request", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -842,6 +920,7 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
     if (!p_tsn_cli)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -860,6 +939,7 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send request", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -872,7 +952,7 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
         invalidate_ctx(p_tsn_cli);
     }
 
-    return;
+    return ret_err;
 
 error:
     if (p_tsn_cli != NULL)
@@ -880,6 +960,8 @@ error:
         invalidate_ctx(p_tsn_cli);
     }
     zb_buf_free(bufid);
+
+    return ret_err;
 }
 
 /**@brief Resolve eui64 address to a short network address.
@@ -900,12 +982,13 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
     zdo_tsn_ctx_t               * p_tsn_cli = NULL;
     zb_bufid_t                    bufid;
     zb_ret_t                      zb_err_code;
+    int                           ret_err = 0;
 
     bufid = zb_buf_get_out();
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
-        return;
+        return -ENOEXEC;
     }
 
     p_req = ZB_BUF_GET_PARAM(bufid, zb_zdo_nwk_addr_req_param_t);
@@ -913,6 +996,7 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
     if (!parse_long_address(argv[1], p_req->ieee_addr))
     {
         print_error(shell, "Incorrect EUI64 address format", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -920,6 +1004,7 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
     if (!p_tsn_cli)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -934,6 +1019,7 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send request", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -946,7 +1032,7 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
         invalidate_ctx(p_tsn_cli);
     }
 
-    return;
+    return ret_err;
 
 error:
     if (p_tsn_cli != NULL)
@@ -954,6 +1040,8 @@ error:
         invalidate_ctx(p_tsn_cli);
     }
     zb_buf_free(bufid);
+
+    return ret_err;
 }
 
 /**@brief Resolve EUI64 by sending IEEE address request.
@@ -970,12 +1058,13 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
     zb_bufid_t                     bufid;
     zb_ret_t                       zb_err_code;
     zb_uint16_t                    addr;
+    int                            ret_err = 0;
 
     bufid = zb_buf_get_out();
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
-        return;
+        return -ENOEXEC;
     }
 
     /* Create new IEEE address request and fill with default values. */
@@ -986,6 +1075,7 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
     if (!parse_hex_u16(argv[1], &addr))
     {
         print_error(shell, "Incorrect network address", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
     p_req->nwk_addr = addr;
@@ -995,6 +1085,7 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
     if (!p_tsn_cli)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -1004,6 +1095,7 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send request", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -1016,7 +1108,7 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
         invalidate_ctx(p_tsn_cli);
     }
 
-    return;
+    return ret_err;
 
 error:
     if (p_tsn_cli != NULL)
@@ -1024,6 +1116,8 @@ error:
         invalidate_ctx(p_tsn_cli);
     }
     zb_buf_free(bufid);
+
+    return ret_err;
 }
 
 /**@brief Get the short 16-bit address of the Zigbee device.
@@ -1054,11 +1148,13 @@ static int cmd_zb_short(const struct shell *shell, size_t argc, char **argv)
         }
 
         print_done(shell, ZB_TRUE);
+        return 0;
     }
     else
     {
         /* Most probably there was no network to join. */
         print_error(shell, "Check if device was commissioned", ZB_FALSE);
+        return -ENOEXEC;
     }
 }
 
@@ -1085,6 +1181,7 @@ static int cmd_zb_eui64(const struct shell *shell, size_t argc, char **argv)
         else
         {
             print_error(shell, "Incorrect EUI64 address format", ZB_FALSE);
+            return -EINVAL;
         }
     }
     else
@@ -1094,6 +1191,8 @@ static int cmd_zb_eui64(const struct shell *shell, size_t argc, char **argv)
 
     print_eui64(shell, addr);
     print_done(shell, ZB_FALSE);
+
+    return 0;
 }
 
 /**@brief Callback called, when mgmt_leave operation takes too long
@@ -1305,7 +1404,8 @@ static int cmd_zb_mgmt_leave(const struct shell *shell, size_t argc, char **argv
         invalidate_ctx(p_tsn_cli);
     }
 
-    return;
+    return 0;
+
 error:
     if (bufid != 0)
     {
@@ -1315,6 +1415,7 @@ error:
     {
         invalidate_ctx(p_tsn_cli);
     }
+    return -ENOEXEC;
 }
 
 /**@brief Request timeout callback.
@@ -1331,8 +1432,8 @@ static void ctx_timeout_cb(zb_uint8_t tsn)
     }
 
     shell_error(p_tsn_ctx->shell, "Error: ZDO request %u timed out.", tsn);
-
     invalidate_ctx(p_tsn_ctx);
+    zb_cmd_processed();
 }
 
 /**@brief A generic ZDO request callback.
@@ -1354,6 +1455,7 @@ static void zdo_request_cb(zb_bufid_t bufid)
     {
         LOG_ERR("Unable to find context for TSN %d", p_resp->tsn);
         zb_buf_free(bufid);
+        zb_cmd_processed();
         return;
     }
 
@@ -1407,6 +1509,7 @@ static void zdo_request_cb(zb_bufid_t bufid)
     {
         invalidate_ctx(p_tsn_ctx);
         zb_buf_free(bufid);
+        zb_cmd_processed();
     }
 }
 
@@ -1586,6 +1689,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
 {
     size_t                     arg_idx = 1U;
     zb_zdo_mgmt_bind_param_t * p_req;
+    int                        ret_err = 0;
 
     zdo_tsn_ctx_t * p_tsn_ctx = NULL;
     zb_bufid_t      bufid     = 0;
@@ -1594,6 +1698,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_ctx == NULL)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
     p_tsn_ctx->shell = shell;
@@ -1603,6 +1708,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
         if (!parse_short_address(argv[arg_idx], &(p_tsn_ctx->cmd_ctx.req_seq.dst_addr)))
         {
             print_error(shell, "Incorrect dst_addr", ZB_FALSE);
+            ret_err = -EINVAL;
             goto error;
         }
         arg_idx++;
@@ -1610,6 +1716,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
     else
     {
         print_error(shell, "dst_addr parameter missing", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -1618,6 +1725,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
         if (!sscan_uint8(argv[arg_idx], &p_tsn_ctx->cmd_ctx.req_seq.start_index))
         {
             print_error(shell, "Incorrect start_index", ZB_FALSE);
+            ret_err = -EINVAL;
             goto error;
         }
         arg_idx++;
@@ -1631,6 +1739,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
     if (arg_idx < argc)
     {
         print_error(shell, "Unexpected extra parameters", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -1638,6 +1747,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
     if (!bufid)
     {
         print_error(shell, "Failed to execute command (buf alloc failed)", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -1650,10 +1760,12 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_ctx->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send request", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
-    return;
+    return ret_err;
+
 error:
     if (bufid != 0)
     {
@@ -1663,6 +1775,7 @@ error:
     {
         invalidate_ctx(p_tsn_ctx);
     }
+    return ret_err;
 }
 
 /**@brief Callback for a single mgmt_lqi_req transaction
@@ -1748,11 +1861,16 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
     zb_zdo_mgmt_lqi_param_t * p_req;
     zb_bufid_t                bufid     = 0;
     zdo_tsn_ctx_t           * p_tsn_cli = NULL;
+    int                       ret_err   = 0;
+    zb_ret_t                  zb_err_code;
+
+    zb_cmd_sem_reset();
 
     bufid = zb_buf_get_out();
     if (!bufid)
     {
         print_error(shell, "Failed to allocate request buffer", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -1761,6 +1879,7 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
     if (!parse_short_address(argv[1], &(p_req->dst_addr)))
     {
         print_error(shell, "Failed to parse destination address", ZB_FALSE);
+        ret_err = -EINVAL;
         goto error;
     }
 
@@ -1768,7 +1887,8 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
     {
         if (!sscan_uint8(argv[2], &(p_req->start_index)))
         {
-            print_error(shell, "Failed to start index", ZB_FALSE);
+            print_error(shell, "Failed to parse start index", ZB_FALSE);
+            ret_err = -EINVAL;
             goto error;
         }
     }
@@ -1781,6 +1901,7 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_cli == NULL)
     {
         print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
@@ -1791,10 +1912,10 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
     if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN)
     {
         print_error(shell, "Failed to send request", ZB_FALSE);
+        ret_err = -ENOEXEC;
         goto error;
     }
 
-    zb_ret_t zb_err_code;
     zb_err_code = ZB_SCHEDULE_APP_ALARM(ctx_timeout_cb,
                                         p_tsn_cli->tsn,
                                         ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT * ZB_TIME_ONE_SECOND);
@@ -1802,9 +1923,12 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
     {
         print_error(shell, "Unable to schedule timeout callback", ZB_FALSE);
         invalidate_ctx(p_tsn_cli);
+        zb_cmd_wait_until_processed(K_SECONDS(ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT));
+    } else {
+        zb_cmd_wait_until_processed(K_FOREVER);
     }
 
-    return;
+    return ret_err;
 
 error:
     if (bufid != 0)
@@ -1816,80 +1940,9 @@ error:
     {
         invalidate_ctx(p_tsn_cli);
     }
+
+    return ret_err;
 }
-
-// MGMT_LEAVE HELP
-    // if ((argc == 1) || (nrf_cli_help_requested(shell)))
-    // {
-    //     print_usage(shell, argv[0],
-    //                 "<h:16-bit dst_addr> [h:device_address eui64] [--children]\r\n"
-    //                 "[--rejoin]"
-    //             );
-    //     return;
-    // }
-//
-
-// MGMT_LQI HELP
-    // if ((argc == 1) || (nrf_cli_help_requested(shell)))
-    // {
-    //     print_usage(shell, argv[0],
-    //                 "<h:short> [d:start index]");
-    //     return;
-    // }
-//
-
-#define BIND_ON_HELP \
-    ("Create bind entry.\n" \
-    "Usage: on <h:source_eui64> <d:source_ep> <h:destination_addr> " \
-        "<d:destination_ep> <h:source_cluster_id> <h:request_dst_addr>")
-
-#define BIND_OFF_HELP \
-    ("Remove bind entry.\n" \
-    "Usage: off <h:source_eui64> <d:source_ep> <h:destination_addr> " \
-        "<d:destination_ep> <h:source_cluster_id> <h:request_dst_addr>")
-
-#define ACTIVE_EP_HELP \
-    ("Send active endpoint request.\n" \
-    "Usage: active_ep <h:16-bit destination_address>")
-
-#define SIMPLE_DESC_HELP \
-    ("Send simple descriptor request.\n" \
-    "Usage: simple_desc_req <h:16-bit destination_address> <d:endpoint>")
-
-#define MATCH_DESC_HELP \
-    ("Send match descriptor request.\n" \
-    "Usage: match_desc <h:16-bit destination_address> " \
-        "<h:requested address/type> <h:profile ID> " \
-        "<d:number of input clusters> [<h:input cluster IDs> ...] " \
-        "<d:number of output clusters> [<h:output cluster IDs> ...] " \
-        "[-t | --timeout d:number of seconds to wait for answers]")
-
-#define NWK_ADDR_HELP \
-    ("Resolve EUI64 address to short network address.\n" \
-    "Usage: nwk_addr <h:EUI64>")
-
-#define IEEE_ADDR_HELP \
-    ("Resolve network short address to EUI64 address.\n" \
-    "Usage: ieee_addr <h:short_addr>")
-
-#define EUI64_HELP \
-    ("Get/set the eui64 address of the node.\n" \
-    "Usage: eui64 [<h:eui64>]")
-
-#define MGMT_BIND_HELP \
-    ("Get binding table (see spec. 2.4.3.3.4)\n" \
-    "Usage: <h:short> [d:start_index]")
-
-#define MGMT_LEAVE_HELP \
-    ("Perform mgmt_leave_req (see spec. 2.4.3.3.5)\n" \
-    "Usage: mgmt_leave <h:16-bit dst_addr> [h:device_address eui64] " \
-        "[--children] [--rejoin]\n" \
-    "--children - Device should also remove its children when leaving.\n" \
-    "--rejoin - Device should rejoin network after leave.")
-
-#define MGMT_LQI_HELP \
-    ("Perform mgmt_lqi request.\n" \
-    "Usage: mgmt_lqi <h:short> [d:start index]")
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_bind,
     SHELL_CMD_ARG(on, NULL, BIND_ON_HELP, cmd_zb_bind, 7, 0),
