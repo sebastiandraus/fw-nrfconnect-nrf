@@ -437,5 +437,3 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 #error "Endpoint handler to be done here"
 NRF_ZIGBEE_EP_HANDLER_REGISTER(report, cli_agent_ep_handler_report);
 #endif
-
-/** @} */
