@@ -26,6 +26,8 @@ static zb_bool_t m_debug_mode = ZB_FALSE;
 /* Zigbee stack processing suspension indicator. */
 static zb_bool_t m_suspended = ZB_FALSE;
 
+static K_SEM_DEFINE(zb_cmd_processed_sem, 0, 1);
+
 LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
 void zb_cli_init(void)
@@ -44,6 +46,21 @@ void zb_set_cli_shell_prompt(const char *new_prompt)
 #else
 	LOG_ERR("Selected shell is not supported.");
 #endif
+}
+
+void zb_cmd_processed(void)
+{
+	k_sem_give(&zb_cmd_processed_sem);
+}
+
+void zb_cmd_wait_until_processed(k_timeout_t timeout)
+{
+	k_sem_take(&zb_cmd_processed_sem, timeout);
+}
+
+void zb_cmd_sem_reset(void)
+{
+	k_sem_reset(&zb_cmd_processed_sem);
 }
 
 /**@brief Returns the number of the Endpoint used by the CLI.

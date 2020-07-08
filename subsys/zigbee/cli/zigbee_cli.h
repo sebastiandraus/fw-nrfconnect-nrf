@@ -16,6 +16,12 @@ void zb_cli_init(void);
 
 void zb_set_cli_shell_prompt(const char *new_prompt);
 
+void zb_cmd_processed(void);
+
+void zb_cmd_wait_until_processed(k_timeout_t timeout);
+
+void zb_cmd_sem_reset(void);
+
 /**@brief Function for returning the number of the endpoint used by the CLI.
  */
 zb_uint8_t zb_get_cli_endpoint(void);
