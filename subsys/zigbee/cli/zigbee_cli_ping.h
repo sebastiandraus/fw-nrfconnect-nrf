@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef ZIGBEE_CLI_PIN_H__
-#define ZIGBEE_CLI_PIN_H__
+#ifndef ZIGBEE_CLI_PING_H__
+#define ZIGBEE_CLI_PING_H__
 
 #include <shell/shell.h>
 
@@ -114,4 +114,4 @@ zb_void_t zb_ping_release_request(ping_request_t * p_request);
  */
 zb_void_t ping_request_send(ping_request_t * p_request);
 
-#endif /* ZIGBEE_CLI_PIN_H__ */
+#endif /* ZIGBEE_CLI_PING_H__ */
