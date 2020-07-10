@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <init.h>
 #include <shell/shell.h>
 #include <shell/shell_uart.h>
 
@@ -33,12 +34,19 @@ LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
 
 /**@brief Function for cli shell initial configuration.
+ *        To be called by SYS_INIT.
+ *
+ * @param[in] unused Unused param.
+ *
+ * @returns By defaults returns 0.
  */
-void zb_cli_init(void)
+static int zb_cli_init(struct device *unused)
 {
 #ifdef CONFIG_ZIGBEE_SHELL_PROMPT
 	zb_set_cli_shell_prompt(CONFIG_ZIGBEE_SHELL_PROMPT);
 #endif
+
+	return 0;
 }
 
 /**@brief Function for setting prompt for cli shell.
@@ -141,3 +149,6 @@ zb_bool_t zb_cli_stack_is_suspended(zb_void_t)
 	}
 	return ZB_TRUE;
 }
+
+/* Initial configuration for CLI shell to be called after kernel start. */
+SYS_INIT(zb_cli_init, POST_KERNEL, 96);

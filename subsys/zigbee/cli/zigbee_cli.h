@@ -12,9 +12,6 @@
 #include <zboss_api.h>
 #include <zigbee_helpers.h>
 
-/**@brief Function for cli shell initial configuration.
- */
-void zb_cli_init(void);
 
 /**@brief Function for setting prompt for cli shell.
  *
