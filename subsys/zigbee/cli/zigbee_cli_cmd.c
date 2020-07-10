@@ -73,7 +73,7 @@ static int cmd_reset(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_debug(const struct shell *shell, size_t argc, char **argv)
 {
-	if (zb_cli_debug_get() == ZB_TRUE) {
+	if (zb_cli_debug_get()) {
 		shell_print(shell, "Debug mode is on.");
 	} else {
 		shell_print(shell, "Debug mode is off.");

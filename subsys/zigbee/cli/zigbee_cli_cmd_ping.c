@@ -13,8 +13,6 @@
 #include "zigbee_cli.h"
 #include "zigbee_cli_ping.h"
 #include "zigbee_cli_utils.h"
-#include "zb_error_handler.h"
-
 /** @brief ZCL Frame control field of Zigbee PING commands.
  */
 #define ZIGBEE_PING_FRAME_CONTROL_FIELD 0x11
