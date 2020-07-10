@@ -201,6 +201,10 @@ static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
 		/* Prepend newline because `print_eui64` does not print LF. */
 		print_done(shell, ZB_TRUE);
 	} else if (argc == 2) {
+		if (zb_cli_is_stack_started()) {
+			print_error(shell, "Stack already started", ZB_FALSE);
+			return -ENOEXEC;
+		}
 		if (parse_long_address(argv[1], extpanid)) {
 			zb_set_extended_pan_id(extpanid);
 			print_done(shell, ZB_FALSE);
@@ -209,11 +213,6 @@ static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
 				    ZB_FALSE);
 			return -EINVAL;
 		}
-	} else {
-		print_error(shell,
-			    "Unsupported format. Expected extpanid <extpanid>",
-			    ZB_FALSE);
-		return -EINVAL;
 	}
 
 	return 0;
@@ -235,11 +234,16 @@ static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_zb_panid(const struct shell *shell, size_t argc, char **argv)
 {
+	zb_uint16_t pan_id;
+
 	if (argc == 1) {
 		shell_print(shell, "%0x", ZB_PIBCACHE_PAN_ID());
 		print_done(shell, ZB_FALSE);
 	} else if (argc == 2) {
-		zb_uint16_t pan_id;
+		if (zb_cli_is_stack_started()) {
+			print_error(shell, "Stack already started", ZB_FALSE);
+			return -ENOEXEC;
+		}
 
 		if (parse_hex_u16(argv[1], &pan_id)) {
 			ZB_PIBCACHE_PAN_ID() = pan_id;
@@ -392,6 +396,17 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 	zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2];
 
 	if ((argc == 2) && (strcmp(argv[0], "set") == 0)) {
+		if (zb_get_network_role() == ZB_NWK_DEVICE_TYPE_COORDINATOR) {
+			print_error(shell, "Device can't be a coordinator",
+				    ZB_FALSE);
+			return -ENOEXEC;
+		}
+
+		if (zb_cli_is_stack_started()) {
+			print_error(shell, "Stack already started", ZB_FALSE);
+			return -ENOEXEC;
+		}
+
 		if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic),
 				   false)) {
 			p_err_msg = "Failed to parse IC";
@@ -406,6 +421,12 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 		/* Check if stack is initialized as Install Code can not
 		 * be added until production config is initialised.
 		 */
+		if (zb_get_network_role() != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
+			print_error(shell, "Device must be a coordinator",
+				    ZB_FALSE);
+			return -ENOEXEC;
+		}
+
 		if (!zb_cli_is_stack_started()) {
 			print_error(shell, "Stack not started", ZB_FALSE);
 			return -ENOEXEC;
@@ -427,6 +448,17 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 			goto exit;
 		}
 	} else if ((argc == 2) && (strcmp(argv[0], "policy") == 0)) {
+		if (zb_get_network_role() != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
+			print_error(shell, "Device must be a coordinator",
+				    ZB_FALSE);
+			return -ENOEXEC;
+		}
+
+		if (zb_cli_is_stack_started()) {
+			print_error(shell, "Stack already started", ZB_FALSE);
+			return -ENOEXEC;
+		}
+
 		if (strcmp(argv[1], "enable") == 0) {
 			zb_set_installcode_policy(ZB_TRUE);
 		} else if (strcmp(argv[1], "disable") == 0) {
@@ -484,6 +516,11 @@ static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
 		} else {
 			print_error(shell, "Unrecognized option", ZB_FALSE);
 			return -EINVAL;
+		}
+		if (zigbee_schedule_callback(zb_bdb_set_legacy_device_support,
+					     m_legacy_mode)) {
+			print_error(shell, "Can not execute command", ZB_FALSE);
+			return -ENOEXEC;
 		}
 	}
 
