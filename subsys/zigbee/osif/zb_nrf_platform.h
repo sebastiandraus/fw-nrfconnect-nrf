@@ -8,7 +8,7 @@
 #define ZB_NRF_PLATFORM_H__
 
 #include <zboss_api.h>
-
+#include <kernel.h>
 
 typedef enum {
 	ZIGBEE_EVENT_TX_FAILED,
@@ -17,6 +17,11 @@ typedef enum {
 	ZIGBEE_EVENT_APP,
 } zigbee_event_t;
 
+/**@brief Gets pointer to zboss thread struct.
+ *
+ * @returns Pointer to zboss thread structure.
+ */
+k_tid_t zb_get_zboss_thread_id(void);
 
 /* Function for starting Zigbee thread. */
 void zigbee_enable(void);

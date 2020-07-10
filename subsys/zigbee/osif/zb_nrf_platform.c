@@ -77,6 +77,13 @@ K_THREAD_STACK_DEFINE(zboss_stack_area, CONFIG_ZBOSS_DEFAULT_THREAD_STACK_SIZE);
 static struct k_thread zboss_thread_data;
 static k_tid_t zboss_tid;
 
+/**@brief Gets pointer to zboss thread struct.
+ */
+k_tid_t zb_get_zboss_thread_id(void)
+{
+	return zboss_tid;
+}
+
 static void zb_app_cb_process(zb_bufid_t bufid)
 {
 	zb_ret_t ret_code = RET_OK;
@@ -264,6 +271,10 @@ static void zboss_thread(void *arg1, void *arg2, void *arg3)
 
 	zb_err_code = zboss_start_no_autostart();
 	__ASSERT(zb_err_code == RET_OK, "Error when starting ZBOSS stack!");
+
+#ifdef CONFIG_ZIGBEE_CLI_SHELL
+	zb_cli_set_stack_as_started();
+#endif /* defined(CONFIG_ZIGBEE_CLI_SHELL) */
 
 	while (1) {
 		zboss_main_loop_iteration();

@@ -427,13 +427,13 @@ static void cmd_zb_ieee_addr_timeout(zb_uint8_t tsn)
 {
     zdo_tsn_ctx_t * p_tsn_ctx = get_ctx_by_tsn(tsn);
 
-    if (!p_tsn_ctx)
+    if (p_tsn_ctx)
     {
-        return;
+        print_error(p_tsn_ctx->shell, "IEEE address request timed out", ZB_FALSE);
+        invalidate_ctx(p_tsn_ctx);
     }
 
-    print_error(p_tsn_ctx->shell, "IEEE address request timed out", ZB_FALSE);
-    invalidate_ctx(p_tsn_ctx);
+    zb_cmd_processed();
 }
 
 /**@brief A callback called on IEEE (EUI64) address response.
@@ -474,7 +474,8 @@ zb_void_t cmd_zb_ieee_addr_cb(zb_bufid_t bufid)
         if (ret == RET_OK)
         {
             print_eui64(p_tsn_ctx->shell, ieee_addr);
-            print_done(p_tsn_ctx->shell, ZB_FALSE);
+            /* Prepend newline because `print_eui64` does not print LF. */
+            print_done(p_tsn_ctx->shell, ZB_TRUE);
         }
         else
         {
@@ -488,6 +489,7 @@ zb_void_t cmd_zb_ieee_addr_cb(zb_bufid_t bufid)
 
     invalidate_ctx(p_tsn_ctx);
     zb_buf_free(bufid);
+    zb_cmd_processed();
 }
 
 /**@brief Send Active Endpoint Request.
@@ -1060,6 +1062,8 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
     zb_uint16_t                    addr;
     int                            ret_err = 0;
 
+    zb_cmd_sem_reset();
+
     bufid = zb_buf_get_out();
     if (!bufid)
     {
@@ -1106,6 +1110,10 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
     {
         print_error(shell, "Unable to schedule timeout timer", ZB_FALSE);
         invalidate_ctx(p_tsn_cli);
+        zb_cmd_wait_until_processed(K_SECONDS(ZIGBEE_CLI_IEEE_ADDR_RESP_TIMEOUT));
+    }
+    else {
+        zb_cmd_wait_until_processed(K_FOREVER);
     }
 
     return ret_err;
@@ -1190,7 +1198,8 @@ static int cmd_zb_eui64(const struct shell *shell, size_t argc, char **argv)
     }
 
     print_eui64(shell, addr);
-    print_done(shell, ZB_FALSE);
+    /* Prepend newline because `print_eui64` does not print LF. */
+    print_done(shell, ZB_TRUE);
 
     return 0;
 }

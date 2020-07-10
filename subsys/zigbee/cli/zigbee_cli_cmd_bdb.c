@@ -9,6 +9,7 @@
 
 #include <zboss_api.h>
 #include <zb_error_handler.h>
+#include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
 
@@ -54,7 +55,7 @@
 	"Usage: role [<role>]")
 
 static zb_nwk_device_type_t m_default_role      = ZB_NWK_DEVICE_TYPE_ROUTER;
-static zb_bool_t            m_stack_is_started  = ZB_FALSE;
+static atomic_t             m_stack_is_started  = ATOMIC_INIT(ZB_FALSE);
 static zb_bool_t            m_legacy_mode       = ZB_FALSE;
 
 /**@brief Set or get Zigbee role of the device.
@@ -96,7 +97,7 @@ static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
 			shell_print(shell, "zed");
 		}
 	} else if (argc == 2) {
-		if (m_stack_is_started) {
+		if (zb_cli_is_stack_started()) {
 			print_error(shell, "Stack already started", ZB_FALSE);
 			return -ENOEXEC;
 		}
@@ -136,10 +137,11 @@ static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
 static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
 {
 	u32_t      channel;
-	zb_bool_t  ret;
+	zb_bool_t  ret = ZB_TRUE;
 	zb_uint8_t mode_mask = ZB_BDB_NETWORK_STEERING;
 
-	if (m_stack_is_started == ZB_FALSE) {
+	if ((!zb_cli_is_stack_started()) &&
+	    (zb_get_zboss_thread_id() == NULL)) {
 		channel = zb_get_bdb_primary_channel_set();
 
 		switch (m_default_role) {
@@ -158,17 +160,12 @@ static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
 			return -ENOEXEC;
 		}
 
-		if (zboss_start_no_autostart() == RET_OK) {
-			ret = ZB_TRUE;
-		} else {
-			ret = ZB_FALSE;
-		}
+		zigbee_enable();
 	} else {
 		ret = bdb_start_top_level_commissioning(mode_mask);
 	}
 
 	if (ret) {
-		m_stack_is_started = ZB_TRUE;
 		print_done(shell, ZB_FALSE);
 		return 0;
 	} else {
@@ -201,7 +198,8 @@ static int cmd_zb_extpanid(const struct shell *shell, size_t argc, char **argv)
 	if (argc == 1) {
 		zb_get_extended_pan_id(extpanid);
 		print_eui64(shell, extpanid);
-		print_done(shell, ZB_FALSE);
+		/* Prepend newline because `print_eui64` does not print LF. */
+		print_done(shell, ZB_TRUE);
 	} else if (argc == 2) {
 		if (parse_long_address(argv[1], extpanid)) {
 			zb_set_extended_pan_id(extpanid);
@@ -312,7 +310,7 @@ static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
 		print_done(shell, ZB_FALSE);
 		return 0;
 	} else if (argc == 2) {
-		if (m_stack_is_started) {
+		if (zb_cli_is_stack_started()) {
 			print_error(shell, "Stack already started", ZB_FALSE);
 			return -ENOEXEC;
 		}
@@ -408,7 +406,7 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 		/* Check if stack is initialized as Install Code can not
 		 * be added until production config is initialised.
 		 */
-		if (!m_stack_is_started) {
+		if (!zb_cli_is_stack_started()) {
 			print_error(shell, "Stack not started", ZB_FALSE);
 			return -ENOEXEC;
 		}
@@ -469,7 +467,7 @@ exit:
  */
 static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
 {
-	if (!m_stack_is_started) {
+	if (!zb_cli_is_stack_started()) {
 		print_error(shell, "Stack not started", ZB_FALSE);
 		return -ENOEXEC;
 	}
@@ -511,7 +509,7 @@ static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
  */
 static int cmd_zb_nwkkey(const struct shell *shell, size_t argc, char **argv)
 {
-	if (m_stack_is_started) {
+	if (zb_cli_is_stack_started()) {
 		print_error(shell, "Stack already started", ZB_FALSE);
 		return -ENOEXEC;
 	}
@@ -569,7 +567,7 @@ static int cmd_child_max(const struct shell *shell, size_t argc, char **argv)
 	u32_t child_max = 0xFFFFFFFF;
 
 	/* Two argc - set the amount of the max_children. */
-	if (m_stack_is_started) {
+	if (zb_cli_is_stack_started()) {
 		print_error(shell, "Stack already started", ZB_FALSE);
 		return -ENOEXEC;
 	}
@@ -592,7 +590,12 @@ static int cmd_child_max(const struct shell *shell, size_t argc, char **argv)
 
 zb_bool_t zb_cli_is_stack_started(void)
 {
-	return m_stack_is_started;
+	return atomic_get(&m_stack_is_started);
+}
+
+zb_void_t zb_cli_set_stack_as_started(void)
+{
+	(void)atomic_set(&m_stack_is_started, ZB_TRUE);
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_ic,
