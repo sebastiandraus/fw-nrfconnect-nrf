@@ -80,8 +80,10 @@ zb_void_t zb_cli_resume(zb_void_t);
 /**@brief Function for getting the state of the Zigbee scheduler
  *        processing suspension.
  *
- * @retval ZB_TRUE  Scheduler processing is suspended.
- * @retval ZB_FALSE Scheduler processing is not suspended.
+ * @retval ZB_TRUE  Scheduler processing is suspended or zboss thread
+ *                  is not yet created.
+ * @retval ZB_FALSE Scheduler processing is not suspended and zboss thread
+ *                  is created,.
  */
 zb_bool_t zb_cli_stack_is_suspended(zb_void_t);
 
@@ -92,5 +94,10 @@ zb_bool_t zb_cli_stack_is_suspended(zb_void_t);
  * @retval ZB_FALSE Zigbee stack has not been started yet
  */
 zb_bool_t zb_cli_is_stack_started(void);
+
+/**@brief Function to be called when Zigbee stack is started,
+ *        sets internal flag.
+ */
+zb_void_t zb_cli_set_stack_as_started(void);
 
 #endif /* ZIGBEE_CLI_H__ */

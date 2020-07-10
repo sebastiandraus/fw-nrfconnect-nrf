@@ -54,8 +54,7 @@
 	("Send raw ZCL frame.\n" \
 	"Usage: raw <h:eui64> <d:ep> <h:cluster> <h:profile> <h:raw_data>")
 
-/**@brief Command set array
- */
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_attr,
 	SHELL_CMD_ARG(read, NULL, ATTR_READ_HELP, cmd_zb_readattr, 6, 1),
 	SHELL_CMD_ARG(write, NULL, ATTR_WRITE_HELP, cmd_zb_writeattr, 8, 1),

@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <shell/shell.h>
 #include <shell/shell_uart.h>
+
+#include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 
 /* CLI Agent endpoint. */
@@ -23,9 +25,6 @@ APP_TIMER_DEF(m_timer_0);
 
 /* Zigbee cli debug mode indicator. */
 static zb_bool_t m_debug_mode = ZB_FALSE;
-
-/* Zigbee stack processing suspension indicator. */
-static zb_bool_t m_suspended = ZB_FALSE;
 
 /* Semaphore used to block shell command handler processing. */
 static K_SEM_DEFINE(zb_cmd_processed_sem, 0, 1);
@@ -118,14 +117,14 @@ zb_bool_t zb_cli_debug_get(zb_void_t)
  */
 zb_void_t zb_cli_suspend(zb_void_t)
 {
-	m_suspended = ZB_TRUE;
+	k_thread_suspend(zb_get_zboss_thread_id());
 }
 
 /**@brief Function for resuming the processing of the Zigbee main loop.
  */
 zb_void_t zb_cli_resume(zb_void_t)
 {
-	m_suspended = ZB_FALSE;
+	k_thread_resume(zb_get_zboss_thread_id());
 }
 
 /**@brief Function for getting the state of the Zigbee stack
@@ -133,5 +132,12 @@ zb_void_t zb_cli_resume(zb_void_t)
  */
 zb_bool_t zb_cli_stack_is_suspended(zb_void_t)
 {
-	return m_suspended;
+	k_tid_t zboss_thread = zb_get_zboss_thread_id();
+
+	if (zboss_thread) {
+		if (!(zboss_thread->base.thread_state & _THREAD_SUSPENDED)) {
+			return ZB_FALSE;
+		}
+	}
+	return ZB_TRUE;
 }
