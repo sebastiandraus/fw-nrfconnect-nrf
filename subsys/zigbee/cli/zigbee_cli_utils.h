@@ -7,6 +7,8 @@
 #ifndef ZIGBEE_CLI_UTILS_H__
 #define ZIGBEE_CLI_UTILS_H__
 
+#include <stdio.h>
+#include <string.h>
 #include <stdbool.h>
 #include <zephyr/types.h>
 #include <shell/shell.h>
@@ -58,22 +60,21 @@ static inline void print_error(const struct shell *shell, const char *p_message,
  *
  * Individual items in the list are delimited by comma.
  *
- * @param shell a pointer to shell instance
- * @param hdr   the list header string
- * @param fmt   a printf like format of an individual list item
- * @param type  type of the list item
- * @param size  the list size (in items)
+ * @param text_buffer   a pointer to text buffer
+ * @param hdr           the list header string
+ * @param fmt           a printf like format of an individual list item
+ * @param type          type of the list item
+ * @param size          the list size (in items)
  */
-#define PRINT_LIST(shell, hdr, fmt, type, ptr, size)                       \
-{                                                                          \
-	shell_fprintf(shell, SHELL_NORMAL, hdr);                           \
-	for (type * p_item = (ptr); p_item < (ptr) + size - 1; p_item++) { \
-		shell_fprintf(shell, SHELL_NORMAL, fmt ",", *p_item);      \
-		}                                                          \
-	if (size > 0) {                                                    \
-		shell_fprintf(shell, SHELL_NORMAL, fmt " ",                \
-		              *((ptr) + size - 1));                        \
-	}                                                                  \
+#define PRINT_LIST(text_buffer, hdr, fmt, type, ptr, size)                                               \
+{                                                                                                  \
+	sprintf((text_buffer + strlen(text_buffer)), hdr);                                                                 \
+	for (type * p_item = (ptr); p_item < (ptr) + size - 1; p_item++) {                         \
+		sprintf((text_buffer + strlen(text_buffer)), fmt ",", *p_item);                    \
+		}                                                                                  \
+	if (size > 0) {                                                                            \
+		sprintf((text_buffer + strlen(text_buffer)), fmt " ", *((ptr) + size - 1));        \
+	}                                                                                          \
 }
 
 /**@brief Convert ZCL attribute value to string.
