@@ -109,7 +109,7 @@ static void zb_app_cb_process(zb_bufid_t bufid)
 			break;
 		case ZB_CALLBACK_TYPE_TWO_PARAMS:
 			ret_code = zb_schedule_app_callback(
-					new_app_cb.func,
+					(zb_callback_t)(new_app_cb.func2),
 					(zb_uint8_t)new_app_cb.param,
 					ZB_TRUE,
 					new_app_cb.user_param,
@@ -295,13 +295,13 @@ zb_ret_t zigbee_schedule_callback(zb_callback_t func, zb_uint8_t param)
 	return RET_OK;
 }
 
-zb_ret_t zigbee_schedule_callback2(zb_callback_t func,
+zb_ret_t zigbee_schedule_callback2(zb_callback2_t func,
 				   zb_uint8_t param,
 				   zb_uint16_t user_param)
 {
 	zb_app_cb_t new_app_cb = {
 		.type = ZB_CALLBACK_TYPE_TWO_PARAMS,
-		.func = func,
+		.func2 = func,
 		.param = param,
 		.user_param = user_param,
 	};

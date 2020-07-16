@@ -72,7 +72,7 @@ zb_ret_t zigbee_schedule_callback(zb_callback_t func, zb_uint8_t param);
  *
  * @return RET_OK or RET_OVERFLOW.
  */
-zb_ret_t zigbee_schedule_callback2(zb_callback_t func, zb_uint8_t param,
+zb_ret_t zigbee_schedule_callback2(zb_callback2_t func, zb_uint8_t param,
 				   zb_uint16_t user_param);
 
 
