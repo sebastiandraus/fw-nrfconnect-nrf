@@ -1,20 +1,20 @@
-/*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
-#include "nrf_cli.h"
-#include "zboss_api.h"
-#include "zb_error_handler.h"
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <errno.h>
+#include <stdlib.h>
+#include <shell/shell.h>
+#include <nrf_802154.h>
+#include <fem/nrf_fem_control_config.h>
+
+#include <zboss_api.h>
+#include <zb_error_handler.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
 
-#include "nrf_802154.h"
-#include "fem/nrf_fem_control_config.h"
-#include "mac_nrf52_transceiver.h"
-
-/**
- * @defgroup zb_cli_cmd_radio Radio commands
- * @ingroup zb_cli
- *
- * @{
- */
 
 /**@brief Activate the Front-End Modules (FEM) by enabling control lines.
  *
@@ -22,72 +22,64 @@
  * radio fem enable
  * @endcode
  *
- * The configuration of the FEM is defined in external/zboss/osif/zb_nrf52_transceiver.c
- * (see the define ZB_FEM_SETTINGS).
- *
- * For more information, see the description of the FEM on the @link_radio_driver
- * Wiki and @ref shared_fem_feature page.
+ * For more information, see the description of the FEM
+ * on the @link_radio_driver Wiki and @ref shared_fem_feature page.
  */
-static void cmd_zb_fem(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_fem(const struct shell *shell, size_t argc, char **argv)
 {
 #ifndef ENABLE_FEM
-    print_error(p_cli, "FEM support disabled", ZB_FALSE);
+	print_error(shell, "FEM support disabled", ZB_FALSE);
+	return -ENOEXEC;
 #else
-    nrf_fem_interface_config_t fem_config;
-    int32_t                    err_code;
+	nrf_fem_interface_config_t fem_config;
+	int                        err_code;
 
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
+	/* Read the current configuration. */
+	err_code = nrf_fem_interface_configuration_get(&fem_config);
+	if (err_code != NRF_SUCCESS) {
+		print_error(shell, "Unable to read current FEM configuration",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    if (argc != 1)
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
+	/* Check if FEM is enabled. FEM can be enabled only once. */
+#if defined(NRF_FEM_CONTROL_DEFAULT_PA_PIN) \
+	&& defined(NRF_FEM_CONTROL_DEFAULT_LNA_PIN) \
+	&& defined(NRF_FEM_CONTROL_DEFAULT_PDN_PIN)
 
-    /* Read the current configuration. */
-    err_code = nrf_fem_interface_configuration_get(&fem_config);
-    if (err_code != NRF_SUCCESS)
-    {
-        print_error(p_cli, "Unable to read current FEM configuration", ZB_FALSE);
-        return;
-    }
-
-    /* Check if FEM is enabled. FEM can be enabled only once. */
-#if defined(NRF_FEM_CONTROL_DEFAULT_PA_PIN) && defined(NRF_FEM_CONTROL_DEFAULT_LNA_PIN) && defined(NRF_FEM_CONTROL_DEFAULT_PDN_PIN)
-    if (fem_config.pa_pin_config.enable  ||
-        fem_config.lna_pin_config.enable ||
-        fem_config.pdn_pin_config.enable)
+	if (fem_config.pa_pin_config.enable ||
+	    fem_config.lna_pin_config.enable ||
+	    fem_config.pdn_pin_config.enable)
 #else
-    if (fem_config.pa_pin_config.enable ||
-        fem_config.lna_pin_config.enable)
+	if (fem_config.pa_pin_config.enable ||
+	    fem_config.lna_pin_config.enable) {
 #endif
-    {
-        print_error(p_cli, "FEM already enabled", ZB_FALSE);
-        return;
-    }
+		print_error(shell, "FEM already enabled", ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    fem_config.pa_pin_config.enable  = 1;
-    fem_config.lna_pin_config.enable = 1;
-#if defined(NRF_FEM_CONTROL_DEFAULT_PA_PIN) && defined(NRF_FEM_CONTROL_DEFAULT_LNA_PIN) && defined(NRF_FEM_CONTROL_DEFAULT_PDN_PIN)
-    fem_config.pdn_pin_config.enable = 1;
+	fem_config.pa_pin_config.enable  = 1;
+	fem_config.lna_pin_config.enable = 1;
+#if defined(NRF_FEM_CONTROL_DEFAULT_PA_PIN) && \
+	defined(NRF_FEM_CONTROL_DEFAULT_LNA_PIN) && \
+	defined(NRF_FEM_CONTROL_DEFAULT_PDN_PIN)
+
+	fem_config.pdn_pin_config.enable = 1;
 #endif
 
-    /* Configure FEM control pins. */
-    nrf_fem_gpio_configure();
+	/* Configure FEM control pins. */
+	nrf_fem_gpio_configure();
 
-    /* Update the configuration. */
-    err_code = nrf_fem_interface_configuration_set(&fem_config);
-    if (err_code != NRF_SUCCESS)
-    {
-        print_error(p_cli, "Unable to update FEM configuration", ZB_FALSE);
-        return;
-    }
+	/* Update the configuration. */
+	err_code = nrf_fem_interface_configuration_set(&fem_config);
+	if (err_code != NRF_SUCCESS) {
+		print_error(shell, "Unable to update FEM configuration",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    print_done(p_cli, ZB_FALSE);
+	print_done(shell, ZB_FALSE);
+	return 0;
 #endif
 }
 
@@ -97,7 +89,8 @@ static void cmd_zb_fem(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * radio fem <pa|lna> <pin|polarity> <d:pin|active_high>
  * @endcode
  *
- * The first argument selects the FEM line to configure. The available options are:
+ * The first argument selects the FEM line to configure.
+ * The available options are:
  * - pa: Power Amplifier
  * - lna: Low Noise Amplifier
  * - pdn: Power Down control pin
@@ -109,132 +102,121 @@ static void cmd_zb_fem(nrf_cli_t const * p_cli, size_t argc, char **argv)
  * The third argument is a value for the selected configuration attribute:
  *  - pin: selects the GPIO pin, which controls the FEM line
  *  - active_high: selects the polarity of the pin that activates the FEM line
- *    (Power Amplifier, Low Noise Amplifier or Power Down control, depending on the first argument).
+ *    (Power Amplifier, Low Noise Amplifier or Power Down control,
+ *     depending on the first argument).
  *
- * @note The FEM configuration may be applied only before the FEM control lines are enabled.
+ * @note The FEM configuration may be applied only before the FEM control
+ *       lines are enabled.
  */
-static void cmd_zb_fem_line(nrf_cli_t const * p_cli, const char * p_line, size_t argc, char **argv)
+static int cmd_zb_fem_line(const struct shell *shell, const char * p_line,
+			   size_t argc, char **argv)
 {
 #ifndef ENABLE_FEM
-    print_error(p_cli, "FEM support disabled", ZB_FALSE);
+	print_error(shell, "FEM support disabled", ZB_FALSE);
+	return -ENOEXEC;
 #else
-    nrf_fem_gpiote_pin_config_t * p_line_config = NULL;
-    nrf_fem_interface_config_t    fem_config;
-    int32_t                       err_code;
-    uint8_t                       value;
+	nrf_fem_gpiote_pin_config_t  *p_line_config = NULL;
+	nrf_fem_interface_config_t    fem_config;
+	int                           err_code;
+	u8_t                          value;
 
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
+	/* Read the current configuration. */
+	err_code = nrf_fem_interface_configuration_get(&fem_config);
+	if (err_code != NRF_SUCCESS) {
+		print_error(shell, "Unable to read current FEM configuration",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    if (argc != 2)
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-        return;
-    }
+	/* Check if FEM is enabled. FEM can be enabled only once. */
+	if (fem_config.pa_pin_config.enable ||
+		fem_config.lna_pin_config.enable) {
+		print_error(shell, "Configuration may be changed only if FEM is disabled",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    /* Read the current configuration. */
-    err_code = nrf_fem_interface_configuration_get(&fem_config);
-    if (err_code != NRF_SUCCESS)
-    {
-        print_error(p_cli, "Unable to read current FEM configuration", ZB_FALSE);
-        return;
-    }
+	/* Resolve line name to configuration structure. */
+	if (strcmp(p_line, "PA") == 0) {
+		p_line_config = &fem_config.pa_pin_config;
+	} else if (strcmp(p_line, "LNA") == 0) {
+		p_line_config = &fem_config.lna_pin_config;
+	}
+#if defined(NRF_FEM_CONTROL_DEFAULT_PA_PIN) && \
+	defined(NRF_FEM_CONTROL_DEFAULT_LNA_PIN) && \
+	defined(NRF_FEM_CONTROL_DEFAULT_PDN_PIN)
 
-    /* Check if FEM is enabled. FEM can be enabled only once. */
-    if (fem_config.pa_pin_config.enable ||
-        fem_config.lna_pin_config.enable)
-    {
-        print_error(p_cli, "Configuration may be changed only if FEM is disabled", ZB_FALSE);
-        return;
-    }
-
-    /* Resolve line name to configuration structure. */
-    if (strcmp(p_line, "PA") == 0)
-    {
-        p_line_config = &fem_config.pa_pin_config;
-    }
-    else if (strcmp(p_line, "LNA") == 0)
-    {
-        p_line_config = &fem_config.lna_pin_config;
-    }
-#if defined(NRF_FEM_CONTROL_DEFAULT_PA_PIN) && defined(NRF_FEM_CONTROL_DEFAULT_LNA_PIN) && defined(NRF_FEM_CONTROL_DEFAULT_PDN_PIN)
-    else if (strcmp(p_line, "PDN") == 0)
-    {
-        p_line_config = &fem_config.pdn_pin_config;
-    }
+	else if (strcmp(p_line, "PDN") == 0) {
+		p_line_config = &fem_config.pdn_pin_config;
+	}
 #endif
-    else
-    {
-        print_error(p_cli, "Unsupported line name", ZB_FALSE);
-        return;
-    }
+	else {
+		print_error(shell, "Unsupported line name", ZB_FALSE);
+		return -EINVAL;
+	}
 
-    /* Parse user input. */
-    err_code = sscan_uint8(argv[1], &value);
-    if (err_code == 0)
-    {
-        print_error(p_cli, "Incorrect value", ZB_FALSE);
-        return;
-    }
+	/* Parse user input. */
+	err_code = sscan_uint8(argv[1], &value);
+	if (err_code == 0) {
+		print_error(shell, "Incorrect value", ZB_FALSE);
+		return -EINVAL;
+	}
 
-    /* Resolve configuration value. */
-    if (strcmp(argv[0], "pin") == 0)
-    {
-        p_line_config->gpio_pin = (uint8_t)value;
-    }
-    else if (strcmp(argv[0], "polarity") == 0)
-    {
-        p_line_config->active_high = (value ? true : false);
-    }
-    else
-    {
-        print_error(p_cli, "Unsupported line configuration option", ZB_FALSE);
-        return;
-    }
+	/* Resolve configuration value. */
+	if (strcmp(argv[0], "pin") == 0) {
+		p_line_config->gpio_pin = (u8_t)value;
+	} else if (strcmp(argv[0], "polarity") == 0) {
+		p_line_config->active_high = (value ? true : false);
+	} else {
+		print_error(shell, "Unsupported line configuration option",
+			    ZB_FALSE);
+		return -EINVAL;
+	}
 
-    /* Update the configuration. */
-    err_code = nrf_fem_interface_configuration_set(&fem_config);
-    if (err_code != NRF_SUCCESS)
-    {
-        print_error(p_cli, "Unable to update FEM configuration", ZB_FALSE);
-        return;
-    }
+	/* Update the configuration. */
+	err_code = nrf_fem_interface_configuration_set(&fem_config);
+	if (err_code != NRF_SUCCESS) {
+		print_error(shell, "Unable to update FEM configuration",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-    print_done(p_cli, ZB_FALSE);
+	print_done(shell, ZB_FALSE);
+	return 0;
 #endif
 }
 
 /**@brief Subcommand to configure Power Amplifier line of FEM module.
  *
- * @note For more information see @ref fem_configure_pin and @ref fem_configure_polarity
- *       commands description.
+ * @note For more information see @ref fem_configure_pin
+ *       and @ref fem_configure_polarity commands description.
  */
-static void cmd_zb_fem_line_pa(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_fem_line_pa(const struct shell *shell, size_t argc,
+			      char **argv)
 {
-    cmd_zb_fem_line(p_cli, "PA", argc, argv);
+	return cmd_zb_fem_line(shell, "PA", argc, argv);
 }
 
 /**@brief Subcommand to configure Low Noise Amplifier line of FEM module.
  *
- * @note For more information see @ref fem_configure_pin and @ref fem_configure_polarity
- *       commands description.
+ * @note For more information see @ref fem_configure_pin
+ *       and @ref fem_configure_polarity commands description.
  */
-static void cmd_zb_fem_line_lna(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_fem_line_lna(const struct shell *shell, size_t argc,
+			       char **argv)
 {
-    cmd_zb_fem_line(p_cli, "LNA", argc, argv);
+	return cmd_zb_fem_line(shell, "LNA", argc, argv);
 }
 
 /**@brief Subcommand to configure Power Down line of FEM module.
  *
- * @note For more information see @ref fem_configure_pin and @ref fem_configure_polarity
- *       commands description.
+ * @note For more information see @ref fem_configure_pin
+ *       and @ref fem_configure_polarity commands description.
  */
-static void cmd_zb_fem_line_pdn(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_fem_line_pdn(const struct shell *shell, size_t argc,
+			       char **argv)
 {
-    cmd_zb_fem_line(p_cli, "PDN", argc, argv);
+	return cmd_zb_fem_line(shell, "PDN", argc, argv);
 }
 
 /**@brief Function to set the 802.15.4 channel directly.
@@ -243,40 +225,31 @@ static void cmd_zb_fem_line_pdn(nrf_cli_t const * p_cli, size_t argc, char **arg
  * radio channel set <n>
  * @endcode
  *
- * The <n> has to be between 11 and 26 included, since these channels are supported by the driver.
+ * The <n> has to be between 11 and 26 included, since these channels
+ * are supported by the driver.
  *
- * @note This function sets the channel directly at runtime, contrary to the `bdb channel` function,
- *       which defines the channels allowed for the Zigbee network formation.
+ * @note This function sets the channel directly at runtime,
+ *       contrary to the `bdb channel` function, which defines the channels
+ *       allowed for the Zigbee network formation.
  */
-static void cmd_zb_channel_set(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_channel_set(const struct shell *shell, size_t argc,
+			      char **argv)
 {
-    if (nrf_cli_help_requested(p_cli))
-    {
-        nrf_cli_help_print(p_cli, NULL, 0);
-        return;
-    }
+	u8_t channel;
 
-    if (argc == 2)
-    {
-        uint8_t channel;
-        if (!sscan_uint8(argv[1], &channel))
-        {
-            print_error(p_cli, "Invalid channel", ZB_FALSE);
-        }
-        else if ((channel < 11) || (channel > 26))
-        {
-            print_error(p_cli, "Only channels from 11 to 26 are supported", ZB_FALSE);
-        }
-        else
-        {
-            nrf_802154_channel_set(channel);
-            print_done(p_cli, ZB_TRUE);
-        }
-    }
-    else
-    {
-        print_error(p_cli, "Wrong number of arguments", ZB_FALSE);
-    }
+	if (!sscan_uint8(argv[1], &channel)) {
+		print_error(shell, "Invalid channel", ZB_FALSE);
+	} else if ((channel < 11) || (channel > 26)) {
+		print_error(shell, "Only channels from 11 to 26 are supported",
+			    ZB_FALSE);
+	} else {
+		nrf_802154_channel_set(channel);
+		print_done(shell, ZB_FALSE);
+
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 /**@brief Function to get the current 802.15.4 channel.
@@ -284,58 +257,57 @@ static void cmd_zb_channel_set(nrf_cli_t const * p_cli, size_t argc, char **argv
  * @code
  * radio channel get
  * @endcode
- * 
+ *
  */
-static void cmd_zb_channel_get(nrf_cli_t const * p_cli, size_t argc, char **argv)
+static int cmd_zb_channel_get(const struct shell *shell, size_t argc,
+			      char **argv)
 {
-    nrf_cli_fprintf(p_cli, NRF_CLI_NORMAL, "Current operating channel: %d", nrf_802154_channel_get());
-    print_done(p_cli, ZB_TRUE);
+	shell_print(shell, "Current operating channel: %d",
+		    nrf_802154_channel_get());
+	print_done(shell, ZB_FALSE);
+
+	return 0;
 }
 
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_fem_line_pa)
-{
-    NRF_CLI_CMD(pin, NULL, "select pin number to use", cmd_zb_fem_line_pa),
-    NRF_CLI_CMD(polarity, NULL, "select active polarity", cmd_zb_fem_line_pa),
-    NRF_CLI_SUBCMD_SET_END
-};
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_fem_line_pa,
+	SHELL_CMD_ARG(pin, NULL, "Select pin number to use", cmd_zb_fem_line_pa,
+		      2, 0),
+	SHELL_CMD_ARG(polarity, NULL, "Select active polarity",
+		      cmd_zb_fem_line_pa, 2, 0),
+	SHELL_SUBCMD_SET_END);
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_fem_line_lna)
-{
-    NRF_CLI_CMD(pin, NULL, "select pin number to use", cmd_zb_fem_line_lna),
-    NRF_CLI_CMD(polarity, NULL, "select active polarity", cmd_zb_fem_line_lna),
-    NRF_CLI_SUBCMD_SET_END
-};
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_fem_line_lna,
+	SHELL_CMD_ARG(pin, NULL, "Select pin number to use",
+		      cmd_zb_fem_line_lna, 2, 0),
+	SHELL_CMD_ARG(polarity, NULL, "Select active polarity",
+		      cmd_zb_fem_line_lna, 2, 0),
+	SHELL_SUBCMD_SET_END);
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_fem_line_pdn)
-{
-    NRF_CLI_CMD(pin, NULL, "select pin number to use", cmd_zb_fem_line_pdn),
-    NRF_CLI_CMD(polarity, NULL, "select active polarity", cmd_zb_fem_line_pdn),
-    NRF_CLI_SUBCMD_SET_END
-};
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_fem_line_pdn,
+	SHELL_CMD_ARG(pin, NULL, "Select pin number to use",
+		      cmd_zb_fem_line_pdn, 2, 0),
+	SHELL_CMD_ARG(polarity, NULL, "Select active polarity",
+		      cmd_zb_fem_line_pdn, 2, 0),
+	SHELL_SUBCMD_SET_END);
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_fem)
-{
-    NRF_CLI_CMD(pa, &m_sub_fem_line_pa, "configure PA control line", NULL),
-    NRF_CLI_CMD(lna, &m_sub_fem_line_lna, "configure LNA control pin", NULL),
-    NRF_CLI_CMD(pdn, &m_sub_fem_line_pdn, "configure PDN control pin", NULL),
-    NRF_CLI_CMD(enable, NULL, "enable FEM", cmd_zb_fem),
-    NRF_CLI_SUBCMD_SET_END
-};
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_fem,
+	SHELL_CMD(pa, &sub_fem_line_pa, "Configure PA control line", NULL),
+	SHELL_CMD(lna, &sub_fem_line_lna, "Configure LNA control pin", NULL),
+	SHELL_CMD(pdn, &sub_fem_line_pdn, "Configure PDN control pin", NULL),
+	SHELL_CMD_ARG(enable, NULL, "Enable FEM", cmd_zb_fem, 1, 0),
+	SHELL_SUBCMD_SET_END);
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_channel)
-{
-    NRF_CLI_CMD(set, NULL, "set 802.15.4 channel", cmd_zb_channel_set),
-    NRF_CLI_CMD(get, NULL, "get 802.15.4 channel", cmd_zb_channel_get),
-    NRF_CLI_SUBCMD_SET_END
-};
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_channel,
+	SHELL_CMD_ARG(set, NULL, "Set 802.15.4 channel", cmd_zb_channel_set,
+		      2, 0),
+	SHELL_CMD_ARG(get, NULL, "Get 802.15.4 channel", cmd_zb_channel_get,
+		      1, 0),
+	SHELL_SUBCMD_SET_END);
 
-NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_radio)
-{
-    NRF_CLI_CMD(fem, &m_sub_fem, "front-end module", NULL),
-    NRF_CLI_CMD(channel, &m_sub_channel, "get/set channel", NULL),
-    NRF_CLI_SUBCMD_SET_END
-};
-NRF_CLI_CMD_REGISTER(radio, &m_sub_radio, "Radio manipulation", NULL);
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_radio,
+	SHELL_CMD(fem, &sub_fem, "Front-end module", NULL),
+	SHELL_CMD(channel, &sub_channel, "Get/set channel", NULL),
+	SHELL_SUBCMD_SET_END);
 
-/** @} */
+SHELL_CMD_REGISTER(radio, &sub_radio, "Radio manipulation", NULL);
