@@ -292,22 +292,22 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_fem_line_pdn,
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_fem,
-	SHELL_CMD(pa, &sub_fem_line_pa, "Configure PA control line", NULL),
 	SHELL_CMD(lna, &sub_fem_line_lna, "Configure LNA control pin", NULL),
+	SHELL_CMD(pa, &sub_fem_line_pa, "Configure PA control line", NULL),
 	SHELL_CMD(pdn, &sub_fem_line_pdn, "Configure PDN control pin", NULL),
 	SHELL_CMD_ARG(enable, NULL, "Enable FEM", cmd_zb_fem, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_channel,
-	SHELL_CMD_ARG(set, NULL, "Set 802.15.4 channel", cmd_zb_channel_set,
-		      2, 0),
 	SHELL_CMD_ARG(get, NULL, "Get 802.15.4 channel", cmd_zb_channel_get,
 		      1, 0),
+	SHELL_CMD_ARG(set, NULL, "Set 802.15.4 channel", cmd_zb_channel_set,
+		      2, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_radio,
-	SHELL_CMD(fem, &sub_fem, "Front-end module", NULL),
 	SHELL_CMD(channel, &sub_channel, "Get/set channel", NULL),
+	SHELL_CMD(fem, &sub_fem, "Front-end module", NULL),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(radio, &sub_radio, "Radio manipulation", NULL);
