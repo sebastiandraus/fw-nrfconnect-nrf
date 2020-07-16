@@ -47,6 +47,11 @@ zb_uint8_t zb_get_cli_endpoint(void);
  */
 zb_void_t zb_set_cli_endpoint(zb_uint8_t ep);
 
+/**@brief Scans ZCL context to find endpoint which can be used to send
+ *        ZCL frames. By default tries to find the lowest number endpoint.
+ */
+zb_void_t zb_set_default_cli_endpoint(zb_void_t);
+
 /**@brief Function for intercepting every frame coming to the endpoint.
  *
  * @param bufid    Reference to the ZBOSS buffer.
