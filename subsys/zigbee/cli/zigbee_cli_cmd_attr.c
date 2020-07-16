@@ -28,7 +28,7 @@ typedef enum attr_type_e {
  *          The key parameter is the sequence number.
  */
 typedef struct attr_query_s {
-	zb_bool_t                  taken;
+	atomic_t                   taken;
 	zb_uint8_t                 seq_num;
 	attr_req_type_t            req_type;
 	zb_addr_u                  remote_node;
@@ -51,7 +51,7 @@ static zb_int8_t get_free_row_attr_table()
 {
 	int i;
 	for (i = 0; i < ATTRIBUTE_TABLE_SIZE; i++) {
-		if (m_attr_table[i].taken == ZB_FALSE) {
+		if (atomic_get(&m_attr_table[i].taken) == ZB_FALSE) {
 			return i;
 		}
 	}
@@ -66,7 +66,7 @@ static zb_int8_t get_attr_table_row_by_sn(zb_uint8_t sernum)
 {
 	int i;
 	for (i = 0; i < ATTRIBUTE_TABLE_SIZE; i++) {
-		if (m_attr_table[i].taken == ZB_TRUE) {
+		if (atomic_get(&m_attr_table[i].taken) == ZB_TRUE) {
 			if (m_attr_table[i].seq_num == sernum) {
 				return i;
 			}
@@ -389,7 +389,8 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	p_row->req_type = ATTR_READ_REQUEST;
-	p_row->taken = ZB_TRUE;
+	atomic_set(&p_row->taken, ZB_TRUE);
+
 	/* Put the shell instance to be used later. */
 	p_row->shell = (const struct shell*)shell;
 
@@ -486,7 +487,7 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	p_row->req_type = ATTR_WRITE_REQUEST;
-	p_row->taken = ZB_TRUE;
+	atomic_set(&p_row->taken, ZB_TRUE);
 	/* Put the shell instance to be used later. */
 	p_row->shell = (const struct shell*)shell;
 
