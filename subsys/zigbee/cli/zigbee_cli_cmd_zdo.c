@@ -90,6 +90,15 @@ typedef struct {
 	zb_uint16_t dst_addr;
 } req_seq_t;
 
+/* Structure to store inforamtion required for sending zdo requests.  */
+typedef struct {
+	zb_bufid_t         buffer_id;
+	zb_uint8_t         ctx_timeout;
+	zb_uint8_t         (*req_fn)(zb_uint8_t, zb_callback_t);
+	void               (*timeout_cb_fn)(zb_bufid_t);
+	void               (*req_cb_fn)(zb_bufid_t);
+} zdo_req_info_t;
+
 /* Forward declarations. */
 static void ctx_timeout_cb(zb_uint8_t tsn);
 
@@ -102,13 +111,9 @@ typedef struct zdo_tsn_ctx {
 	atomic_t           taken;
 	union {
 		/* Extra context for commands which request tables. */
-		req_seq_t req_seq;
+		req_seq_t  req_seq;
 	} cmd_ctx;
-	zb_bufid_t         buffer_id;
-	zb_uint8_t         ctx_timeout;
-	void               (*p_zdo_timeout_cb_fn)(zb_bufid_t);
-	zb_uint8_t         (*p_zdo_req_fn)(zb_uint8_t, zb_callback_t);
-	void               (*p_zdo_request_cb_fn)(zb_bufid_t);
+	zdo_req_info_t     zdo_req;
 } zdo_tsn_ctx_t;
 
 static zdo_tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_ZDO_TSN];
@@ -159,10 +164,10 @@ static void invalidate_ctx(zdo_tsn_ctx_t *p_tsn_ctx)
 	p_tsn_ctx->shell               = NULL;
 	p_tsn_ctx->p_cb_fn             = NULL;
 	p_tsn_ctx->is_broadcast        = false;
-	p_tsn_ctx->buffer_id           = 0;
-	p_tsn_ctx->ctx_timeout         = 0;
-	p_tsn_ctx->p_zdo_req_fn        = NULL;
-	p_tsn_ctx->p_zdo_request_cb_fn = NULL;
+	p_tsn_ctx->zdo_req.buffer_id   = 0;
+	p_tsn_ctx->zdo_req.ctx_timeout = 0;
+	p_tsn_ctx->zdo_req.req_fn      = NULL;
+	p_tsn_ctx->zdo_req.req_cb_fn   = NULL;
 	atomic_set(&p_tsn_ctx->taken, false);
 }
 
@@ -187,28 +192,34 @@ static int sscan_cluster_list(char ** pp_argv, u8_t num, u16_t * pp_id)
 	return (len == num);
 }
 
+/**@brief Function to be executed in Zigbee thread to ensure that
+ * non-thread-safe ZDO API is safely called.
+ *
+ * @param[in] idx Index of row in `m_tsn_ctx` table in which zdo request
+ *                informations are stored.
+ */
 static void zb_zdo_req(u8_t idx)
 {
-	zdo_tsn_ctx_t *p_tsn_cli = (m_tsn_ctx + idx);
-	zb_ret_t      zb_err_code;
+	zdo_tsn_ctx_t  *p_tsn_cli = (m_tsn_ctx + idx);
+	zdo_req_info_t *p_req_ctx = &(p_tsn_cli->zdo_req);
+	zb_ret_t       zb_err_code;
 
 	/* Call the actual request function. */
-	p_tsn_cli->tsn   = p_tsn_cli->p_zdo_req_fn(
-				p_tsn_cli->buffer_id,
-				p_tsn_cli->p_zdo_request_cb_fn);
+	p_tsn_cli->tsn   = p_req_ctx->req_fn(p_req_ctx->buffer_id,
+					     p_req_ctx->req_cb_fn);
 
 	if (p_tsn_cli->tsn == ZB_ZDO_INVALID_TSN) {
 		print_error(p_tsn_cli->shell, "Failed to send request",
 			    ZB_FALSE);
 		invalidate_ctx(p_tsn_cli);
-		zb_buf_free(p_tsn_cli->buffer_id);
+		zb_buf_free(p_req_ctx->buffer_id);
 		return;
 
-	} else if (p_tsn_cli->ctx_timeout && p_tsn_cli->p_zdo_timeout_cb_fn) {
+	} else if (p_req_ctx->ctx_timeout && p_req_ctx->timeout_cb_fn) {
 		zb_err_code = ZB_SCHEDULE_APP_ALARM(
-				p_tsn_cli->p_zdo_timeout_cb_fn,
+				p_req_ctx->timeout_cb_fn,
 				p_tsn_cli->tsn,
-				p_tsn_cli->ctx_timeout * ZB_TIME_ONE_SECOND);
+				p_req_ctx->ctx_timeout * ZB_TIME_ONE_SECOND);
 		if (zb_err_code != RET_OK) {
 			print_error(p_tsn_cli->shell, "Unable to schedule timeout callback",
 				    ZB_FALSE);
@@ -582,14 +593,14 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
-	p_tsn_cli->p_zdo_req_fn = zb_zdo_active_ep_req;
-	p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_active_ep_cb;
-	p_tsn_cli->ctx_timeout = 0;
-	p_tsn_cli->p_zdo_timeout_cb_fn = NULL;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
+	p_tsn_cli->zdo_req.req_fn = zb_zdo_active_ep_req;
+	p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_active_ep_cb;
+	p_tsn_cli->zdo_req.ctx_timeout = 0;
+	p_tsn_cli->zdo_req.timeout_cb_fn = NULL;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
-					       (p_tsn_cli - m_tsn_ctx));
+					      (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
 		invalidate_ctx(p_tsn_cli);
@@ -660,11 +671,11 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc,
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
-	p_tsn_cli->p_zdo_req_fn = zb_zdo_simple_desc_req;
-	p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_simple_desc_req_cb;
-	p_tsn_cli->ctx_timeout = 0;
-	p_tsn_cli->p_zdo_timeout_cb_fn = NULL;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
+	p_tsn_cli->zdo_req.req_fn = zb_zdo_simple_desc_req;
+	p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_simple_desc_req_cb;
+	p_tsn_cli->zdo_req.ctx_timeout = 0;
+	p_tsn_cli->zdo_req.timeout_cb_fn = NULL;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
@@ -858,17 +869,17 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc,
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
 	p_tsn_cli->is_broadcast = ZB_NWK_IS_ADDRESS_BROADCAST(p_req->nwk_addr);
-	p_tsn_cli->p_zdo_req_fn = zb_zdo_match_desc_req;
-	p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_match_desc_cb;
+	p_tsn_cli->zdo_req.req_fn = zb_zdo_match_desc_req;
+	p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_match_desc_cb;
 
 	if (use_timeout || !p_tsn_cli->is_broadcast) {
-		p_tsn_cli->ctx_timeout = timeout;
-		p_tsn_cli->p_zdo_timeout_cb_fn = cmd_zb_match_desc_timeout;
+		p_tsn_cli->zdo_req.ctx_timeout = timeout;
+		p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_match_desc_timeout;
 	} else {
-		p_tsn_cli->ctx_timeout = 0;
-		p_tsn_cli->p_zdo_timeout_cb_fn = NULL;
+		p_tsn_cli->zdo_req.ctx_timeout = 0;
+		p_tsn_cli->zdo_req.timeout_cb_fn = NULL;
 	}
 
 	shell_print(shell, "Sending %s request.",
@@ -987,16 +998,16 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
 	if (bind) {
-		p_tsn_cli->p_zdo_req_fn = zb_zdo_bind_req;
-		p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_bind_unbind_cb;
+		p_tsn_cli->zdo_req.req_fn = zb_zdo_bind_req;
+		p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_bind_unbind_cb;
 	} else {
-		p_tsn_cli->p_zdo_req_fn = zb_zdo_unbind_req;
-		p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_bind_unbind_cb;
+		p_tsn_cli->zdo_req.req_fn = zb_zdo_unbind_req;
+		p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_bind_unbind_cb;
 	}
-	p_tsn_cli->ctx_timeout = ZIGBEE_CLI_BIND_RESP_TIMEOUT;
-	p_tsn_cli->p_zdo_timeout_cb_fn = cmd_zb_bind_unbind_timeout;
+	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_BIND_RESP_TIMEOUT;
+	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_bind_unbind_timeout;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
@@ -1068,11 +1079,11 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
-	p_tsn_cli->p_zdo_req_fn = zb_zdo_nwk_addr_req;
-	p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_nwk_addr_cb;
-	p_tsn_cli->ctx_timeout = ZIGBEE_CLI_NWK_ADDR_RESP_TIMEOUT;
-	p_tsn_cli->p_zdo_timeout_cb_fn = cmd_zb_nwk_addr_timeout;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
+	p_tsn_cli->zdo_req.req_fn = zb_zdo_nwk_addr_req;
+	p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_nwk_addr_cb;
+	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_NWK_ADDR_RESP_TIMEOUT;
+	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_nwk_addr_timeout;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
@@ -1139,11 +1150,11 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
-	p_tsn_cli->p_zdo_req_fn = zb_zdo_ieee_addr_req;
-	p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_ieee_addr_cb;
-	p_tsn_cli->ctx_timeout = ZIGBEE_CLI_IEEE_ADDR_RESP_TIMEOUT;
-	p_tsn_cli->p_zdo_timeout_cb_fn = cmd_zb_ieee_addr_timeout;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
+	p_tsn_cli->zdo_req.req_fn = zb_zdo_ieee_addr_req;
+	p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_ieee_addr_cb;
+	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_IEEE_ADDR_RESP_TIMEOUT;
+	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_ieee_addr_timeout;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
@@ -1433,11 +1444,11 @@ static int cmd_zb_mgmt_leave(const struct shell *shell, size_t argc,
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
-	p_tsn_cli->p_zdo_req_fn = zdo_mgmt_leave_req;
-	p_tsn_cli->p_zdo_request_cb_fn = cmd_zb_mgmt_leave_cb;
-	p_tsn_cli->ctx_timeout = ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT;
-	p_tsn_cli->p_zdo_timeout_cb_fn = cmd_zb_mgmt_leave_timeout_cb;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
+	p_tsn_cli->zdo_req.req_fn = zdo_mgmt_leave_req;
+	p_tsn_cli->zdo_req.req_cb_fn = cmd_zb_mgmt_leave_cb;
+	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT;
+	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_mgmt_leave_timeout_cb;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
@@ -1808,11 +1819,11 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
 
 	/* Initialize context and send a request. */
 	p_tsn_ctx->shell = shell;
-	p_tsn_ctx->buffer_id = bufid;
-	p_tsn_ctx->p_zdo_req_fn = zb_zdo_mgmt_bind_req;
-	p_tsn_ctx->p_zdo_request_cb_fn = cmd_zb_mgmt_bind_cb;
-	p_tsn_ctx->ctx_timeout = 0;
-	p_tsn_ctx->p_zdo_timeout_cb_fn = NULL;
+	p_tsn_ctx->zdo_req.buffer_id = bufid;
+	p_tsn_ctx->zdo_req.req_fn = zb_zdo_mgmt_bind_req;
+	p_tsn_ctx->zdo_req.req_cb_fn = cmd_zb_mgmt_bind_cb;
+	p_tsn_ctx->zdo_req.ctx_timeout = 0;
+	p_tsn_ctx->zdo_req.timeout_cb_fn = NULL;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_ctx - m_tsn_ctx));
@@ -1966,12 +1977,12 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
 
 	/* Initialize context and send a request. */
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->buffer_id = bufid;
+	p_tsn_cli->zdo_req.buffer_id = bufid;
 	p_tsn_cli->p_cb_fn  = zdo_mgmt_lqi_cb;
-	p_tsn_cli->p_zdo_req_fn = zb_zdo_mgmt_lqi_req;
-	p_tsn_cli->p_zdo_request_cb_fn = zdo_request_cb;
-	p_tsn_cli->ctx_timeout = ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT;
-	p_tsn_cli->p_zdo_timeout_cb_fn = ctx_timeout_cb;
+	p_tsn_cli->zdo_req.req_fn = zb_zdo_mgmt_lqi_req;
+	p_tsn_cli->zdo_req.req_cb_fn = zdo_request_cb;
+	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT;
+	p_tsn_cli->zdo_req.timeout_cb_fn = ctx_timeout_cb;
 
 	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
