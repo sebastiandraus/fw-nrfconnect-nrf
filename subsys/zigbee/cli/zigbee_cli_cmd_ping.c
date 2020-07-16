@@ -200,7 +200,7 @@ static void zb_zcl_send_ping_frame(zb_uint8_t idx, zb_uint16_t is_request)
 	zb_err_code = zb_zcl_finish_and_send_packet_new(
 				packet_info->buffer,
 				packet_info->ptr,
-				packet_info->dst_addr,
+				&(packet_info->dst_addr),
 				packet_info->dst_addr_mode,
 				packet_info->dst_ep,
 				packet_info->ep,
@@ -463,7 +463,7 @@ zb_void_t ping_request_send(ping_request_t * p_request)
 	/* Schedle frame to send. */
 	p_request->packet_info.buffer = bufid;
 	p_request->packet_info.ptr = p_cmd_buf;
-	p_request->packet_info.dst_addr = &(p_request->remote_addr);
+	p_request->packet_info.dst_addr = p_request->remote_addr;
 	p_request->packet_info.dst_addr_mode = p_request->remote_addr_mode;
 	p_request->packet_info.dst_ep = cli_ep;
 	p_request->packet_info.ep = cli_ep;
@@ -516,7 +516,7 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 	p_reply->packet_info.buffer = bufid;
 	p_reply->packet_info.ptr = p_cmd_buf;
 	p_reply->packet_info.dst_addr =
-		(zb_addr_u *)(&(p_reply->remote_short_addr));
+			(zb_addr_u)(p_reply->remote_short_addr);
 	p_reply->packet_info.dst_addr_mode =
 		ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
 	p_reply->packet_info.dst_ep = cli_ep;
