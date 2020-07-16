@@ -13,8 +13,10 @@
 #include "zigbee_cli.h"
 #include "zigbee_cli_ping.h"
 #include "zigbee_cli_utils.h"
+
 /** @brief ZCL Frame control field of Zigbee PING commands.
  */
+
 #define ZIGBEE_PING_FRAME_CONTROL_FIELD 0x11
 
 #define LOG_SUBMODULE_NAME ping
@@ -23,17 +25,18 @@ LOG_MODULE_REGISTER(LOG_SUBMODULE_NAME, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
 /**@brief The row of the table which holds the replies which are to be sent.
  *
- * @details We use the table to temporarily store the parameters of the ping reply
- *          while it is traversing the ZBOSS callback system.
+ * @details We use the table to temporarily store the parameters of the ping
+ *          reply while it is traversing the ZBOSS callback system.
  *          The key parameter is the sequence number.
  */
 typedef struct ping_reply_s {
-	zb_bool_t           taken;
+	atomic_t            taken;
 	zb_uint16_t         remote_short_addr;
 	zb_uint8_t          ping_seq;
 	zb_uint8_t          count;
 	zb_uint8_t          send_ack;
 	const struct shell  *shell;
+	zcl_packet_info_t   packet_info;
 } ping_reply_t;
 
 
@@ -47,10 +50,9 @@ static zb_uint32_t get_request_duration(ping_request_t * p_request);
 ping_request_t * zb_ping_acquire_request(void)
 {
 	int i;
-
 	for (i = 0; i < PING_TABLE_SIZE; i++) {
-		if (m_ping_request_table[i].taken == ZB_FALSE) {
-			m_ping_request_table[i].taken = ZB_TRUE;
+		if (atomic_get(&m_ping_request_table[i].taken) == ZB_FALSE) {
+			atomic_set(&m_ping_request_table[i].taken, ZB_TRUE);
 			return &(m_ping_request_table[i]);
 		}
 	}
@@ -61,6 +63,7 @@ ping_request_t * zb_ping_acquire_request(void)
 zb_void_t zb_ping_release_request(ping_request_t * p_reply)
 {
 	if (p_reply != NULL) {
+		atomic_set(&p_reply->taken, ZB_FALSE);
 		ZB_MEMSET(p_reply, 0x00, sizeof(ping_request_t));
 	}
 }
@@ -74,8 +77,8 @@ static ping_reply_t * ping_aquire_reply(void)
 	int i;
 
 	for (i = 0; i < PING_TABLE_SIZE; i++) {
-		if (m_ping_reply_table[i].taken == ZB_FALSE) {
-			m_ping_reply_table[i].taken = ZB_TRUE;
+		if (atomic_get(&m_ping_reply_table[i].taken) == ZB_FALSE) {
+			atomic_set(&m_ping_reply_table[i].taken, ZB_TRUE);
 			return &(m_ping_reply_table[i]);
 		}
 	}
@@ -90,6 +93,7 @@ static ping_reply_t * ping_aquire_reply(void)
 zb_void_t ping_release_reply(ping_reply_t * p_reply)
 {
 	if (p_reply != NULL) {
+		atomic_set(&p_reply->taken, ZB_FALSE);
 		ZB_MEMSET(p_reply, 0x00, sizeof(ping_reply_t));
 	}
 }
@@ -101,11 +105,11 @@ zb_void_t ping_release_reply(ping_reply_t * p_reply)
 static zb_void_t invalidate_row_cb(zb_uint8_t row)
 {
 	ping_request_t * p_request = &(m_ping_request_table[row]);
-	u32_t            delay_us = get_request_duration(p_request);
+	u32_t            delay_ms = get_request_duration(p_request);
 
 	/* Inform user about timeout event. */
 	if (p_request->p_cb) {
-		p_request->p_cb(PING_EVT_FRAME_TIMEOUT, delay_us, p_request);
+		p_request->p_cb(PING_EVT_FRAME_TIMEOUT, delay_ms, p_request);
 	}
 
 	zb_ping_release_request(p_request);
@@ -125,7 +129,7 @@ static ping_request_t * find_request_by_short(zb_uint16_t addr_short)
 	for (i = 0; i < PING_TABLE_SIZE; i++) {
 		req_remote_addr = m_ping_request_table[i].remote_addr;
 
-		if (m_ping_request_table[i].taken == ZB_TRUE) {
+		if (atomic_get(&m_ping_request_table[i].taken) == ZB_TRUE) {
 			if (m_ping_request_table[i].remote_addr_mode ==
 			    ZB_APS_ADDR_MODE_16_ENDP_PRESENT) {
 				if (req_remote_addr.addr_short == addr_short) {
@@ -153,7 +157,7 @@ static ping_request_t * find_request_by_sn(zb_uint8_t seqnum)
 	int i;
 
 	for (i = 0; i < PING_TABLE_SIZE; i++) {
-		if (m_ping_request_table[i].taken == ZB_TRUE) {
+		if (atomic_get(&m_ping_request_table[i].taken) == ZB_TRUE) {
 			if (m_ping_request_table[i].ping_seq == seqnum) {
 				return &m_ping_request_table[i];
 			}
@@ -178,56 +182,94 @@ static zb_int8_t get_request_row(ping_request_t * p_request)
 	return -1;
 }
 
-/**@brief Get current abs time.
- */
-static time_abs_t abs_time_now(void)
+static void zb_zcl_send_ping_frame(zb_uint8_t idx, zb_uint16_t is_request)
 {
-	time_abs_t now;
-	now.time_zb = ZB_TIMER_GET();
-#ifndef DEVELOPMENT_TODO
-#error "Reference to NRF TIMER - replace with Zephyr timer, but no zboss-used timer!"
-	/* Zigbee stack in end device role may disable timer at any time. */
-#ifdef ZB_ED_ROLE
-	now.time_tim = 0;
-#else
-	now.time_tim = nrf_drv_timer_capture(zb_nrf_cfg_get_zboss_timer(), NRF_TIMER_CC_CHANNEL2);
-#endif
-#endif
-	return now;
+	zb_ret_t zb_err_code;
+	zcl_packet_info_t *packet_info;
+
+	if (is_request) {
+		packet_info = &(m_ping_request_table[idx].packet_info);
+
+		/* Capture the sending time. */
+		m_ping_request_table[idx].sent_time = k_uptime_ticks();
+	} else {
+		packet_info = &(m_ping_reply_table[idx].packet_info);
+	}
+
+	/* Send the actual frame. */
+	zb_err_code = zb_zcl_finish_and_send_packet_new(
+				packet_info->buffer,
+				packet_info->ptr,
+				packet_info->dst_addr,
+				packet_info->dst_addr_mode,
+				packet_info->dst_ep,
+				packet_info->ep,
+				packet_info->prof_id,
+				packet_info->cluster_id,
+				packet_info->cb,
+				0,
+				packet_info->disable_aps_ack,
+				0);
+
+	if (is_request) {
+		ping_request_t *p_request = &m_ping_request_table[idx];
+
+		if (zb_err_code != RET_OK) {
+			print_error(p_request->shell,
+				    "Can not send zcl frame", ZB_FALSE);
+			zb_ping_release_request(p_request);
+			return;
+		}
+
+		zb_err_code = ZB_SCHEDULE_APP_ALARM(
+					invalidate_row_cb,
+					idx,
+					ZB_MILLISECONDS_TO_BEACON_INTERVAL(
+						p_request->timeout_ms));
+		if (zb_err_code != RET_OK) {
+			print_error(p_request->shell, "Can not schedule timeout alarm.",
+				    ZB_FALSE);
+			zb_ping_release_request(p_request);
+			return;
+		}
+
+		if (p_request->p_cb) {
+			u32_t time_diff = get_request_duration(p_request);
+			p_request->p_cb(PING_EVT_FRAME_SCHEDULED, time_diff,
+					p_request);
+		}
+	} else {
+		if (zb_err_code != RET_OK) {
+		print_error(m_ping_reply_table[idx].shell,
+			    "Can not send zcl frame", ZB_FALSE);
+		}
+		/* We don't need the row in this table anymore,
+		 * since we're not expecting any reply to a Ping Reply.
+		 */
+		ping_release_reply(&(m_ping_reply_table[idx]));
+	}
 }
 
-/**@brief Get time difference, in microseconds between ping request identified
+/**@brief Get time difference, in miliseconds between ping request identified
  *        by row number and current time.
  *
  * @param[in] p_row  Pointer to the ping request structure,
  *                   from which the time difference should be calculated.
  *
- * @return  Time difference in microseconds.
+ * @return  Time difference in miliseconds.
  */
 static zb_uint32_t get_request_duration(ping_request_t * p_request)
 {
-	u32_t time_diff;
+	u32_t time_diff_ms;
+	s32_t time_diff_ticks;
 
 	/* Calculate the time difference between request being sent
 	 * and reply being received.
 	 */
+	time_diff_ticks = k_uptime_ticks() - p_request->sent_time;
+	time_diff_ms = k_ticks_to_ms_near32(time_diff_ticks);
 
-#ifndef DEVELOPMENT_TODO
-#error "NRF Timer reference here! We need to use Zephyr time based timer!"
-	/* Zigbee stack in end device role may disable timer at any time. */
-#ifdef ZB_ED_ROLE
-	zb_uint32_t recv_tim = 0;
-#else
-	zb_uint32_t recv_tim = nrf_drv_timer_capture(zb_nrf_cfg_get_zboss_timer(), NRF_TIMER_CC_CHANNEL2);
-#endif
-	zb_time_t   recv_zb  = ZB_TIMER_GET();
-	zb_uint32_t sent_tim = p_request->sent.time_tim;
-	zb_time_t   sent_zb  = p_request->sent.time_zb;
-	time_diff = (ZB_TIME_BEACON_INTERVAL_TO_USEC(ZB_TIME_SUBTRACT(recv_zb, sent_zb)) +
-				 recv_tim) - sent_tim;
-#endif
-
-	return time_diff;
+	return time_diff_ms;
 }
 
 static zb_void_t frame_acked_cb(zb_bufid_t bufid)
@@ -274,18 +316,18 @@ static zb_void_t dispatch_user_callback(zb_bufid_t bufid)
 	p_request = find_request_by_short(short_addr);
 
 	if (p_request != NULL) {
-		u32_t delay_us = get_request_duration(p_request);
+		u32_t delay_ms = get_request_duration(p_request);
 
 		if (p_cmd_ping_status->status == RET_OK) {
 			/* Inform user about ACK reception. */
 			if (p_request->p_cb) {
 				if (p_request->request_ack == 0) {
 					p_request->p_cb(PING_EVT_FRAME_SENT,
-							delay_us, p_request);
+							delay_ms, p_request);
 				}
 				else {
 					p_request->p_cb(PING_EVT_ACK_RECEIVED,
-							delay_us, p_request);
+							delay_ms, p_request);
 				}
 			}
 
@@ -314,11 +356,11 @@ static zb_void_t dispatch_user_callback(zb_bufid_t bufid)
  *         and exits.
  *
  * @param[in] evt_type  Type of received  ping acknowledgment
- * @param[in] delay_us  Time, in microseconds, between ping request
+ * @param[in] delay_ms  Time, in miliseconds, between ping request
  *                      and the event.
  * @param[in] p_request Pointer to the ongoing ping request context structure.
  */
-static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_us,
+static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_ms,
 				 ping_request_t * p_request)
 {
 	switch (evt) {
@@ -326,17 +368,19 @@ static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_us,
 		break;
 
 	case PING_EVT_FRAME_TIMEOUT:
-		shell_error(p_request->shell, "Error: Request timed out after %ld ms.", delay_us/1000);
+		shell_error(p_request->shell, "Error: Request timed out after %ld ms.",
+			    delay_ms);
 		break;
 
 	case PING_EVT_ECHO_RECEIVED:
-		shell_print(p_request->shell, "Ping time: %ld ms", delay_us/1000);
+		shell_print(p_request->shell, "Ping time: %ld ms", delay_ms);
 		print_done(p_request->shell, ZB_FALSE);
 		break;
 
 	case PING_EVT_ACK_RECEIVED:
 		if (p_request->request_echo == 0) {
-			shell_print(p_request->shell, "Ping time: %ld ms", delay_us/1000);
+			shell_print(p_request->shell, "Ping time: %ld ms",
+				    delay_ms);
 			print_done(p_request->shell, ZB_FALSE);
 		}
 		break;
@@ -349,7 +393,8 @@ static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_us,
 		break;
 
 	case PING_EVT_ERROR:
-		print_error(p_request->shell, "Unable to send ping request", ZB_TRUE);
+		print_error(p_request->shell, "Unable to send ping request",
+			    ZB_FALSE);
 		break;
 
 	default:
@@ -413,36 +458,29 @@ zb_void_t ping_request_send(ping_request_t * p_request)
 	p_request->ping_seq = m_ping_seq_num;
 	m_ping_seq_num++;
 
-	/* Capture the sending time. */
-	p_request->sent = abs_time_now();
+	/* Schedle frame to send. */
+	p_request->packet_info.buffer = bufid;
+	p_request->packet_info.ptr = p_cmd_buf;
+	p_request->packet_info.dst_addr = &(p_request->remote_addr);
+	p_request->packet_info.dst_addr_mode = p_request->remote_addr_mode;
+	p_request->packet_info.dst_ep = cli_ep;
+	p_request->packet_info.ep = cli_ep;
+	p_request->packet_info.prof_id = ZB_AF_HA_PROFILE_ID;
+	p_request->packet_info.cluster_id = PING_CUSTOM_CLUSTER;
+	p_request->packet_info.cb = dispatch_user_callback;
+	p_request->packet_info.disable_aps_ack =
+		(p_request->request_ack ? ZB_FALSE : ZB_TRUE);
 
-	/* Actually send the frame. */
-	if (p_request->request_ack) {
-		zb_err_code = zb_zcl_finish_and_send_packet(
-				bufid, p_cmd_buf, &(p_request->remote_addr),
-				p_request->remote_addr_mode, cli_ep, cli_ep,
-				ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
-				dispatch_user_callback);
-		ZB_ERROR_CHECK(zb_err_code);
-	} else {
-		zb_err_code = zb_zcl_finish_and_send_packet_new(
-				bufid, p_cmd_buf, &(p_request->remote_addr),
-				p_request->remote_addr_mode, cli_ep, cli_ep,
-				ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
-				dispatch_user_callback, ZB_FALSE, ZB_TRUE, 0);
-		ZB_ERROR_CHECK(zb_err_code);
+	zb_err_code = zigbee_schedule_callback2(zb_zcl_send_ping_frame,
+						get_request_row(p_request),
+						ZB_TRUE);
+	if (zb_err_code != RET_OK) {
+		print_error(p_request->shell,
+				"Can not schedule zcl frame.",
+				ZB_FALSE);
+		zb_ping_release_request(p_request);
+		return;
 	}
-
-	if (p_request->p_cb) {
-		u32_t time_diff = get_request_duration(p_request);
-		p_request->p_cb(PING_EVT_FRAME_SCHEDULED, time_diff, p_request);
-	}
-
-	zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb,
-					    get_request_row(p_request),
-					    ZB_MILLISECONDS_TO_BEACON_INTERVAL(
-						    p_request->timeout_ms));
-	ZB_ERROR_CHECK(zb_err_code);
 }
 
 /**@brief Actually construct the Ping Reply frame and send it.
@@ -471,28 +509,31 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 	memset(p_cmd_buf, PING_ECHO_REPLY_BYTE, p_reply->count);
 	p_cmd_buf += p_reply->count;
 
-	/* Actually send the frame */
-	if (p_reply->send_ack) {
-		zb_err_code = zb_zcl_finish_and_send_packet(
-				bufid, p_cmd_buf,
-				(zb_addr_u *)(&(p_reply->remote_short_addr)),
-				ZB_APS_ADDR_MODE_16_ENDP_PRESENT, cli_ep,
-				cli_ep, ZB_AF_HA_PROFILE_ID,
-				PING_CUSTOM_CLUSTER, frame_acked_cb);
-		ZB_ERROR_CHECK(zb_err_code);
-	} else {
-		zb_err_code = zb_zcl_finish_and_send_packet_new(
-				bufid, p_cmd_buf, (zb_addr_u *)(&(p_reply->remote_short_addr)),
-				ZB_APS_ADDR_MODE_16_ENDP_PRESENT, cli_ep, cli_ep,
-				ZB_AF_HA_PROFILE_ID, PING_CUSTOM_CLUSTER,
-				frame_acked_cb, ZB_FALSE, ZB_TRUE, 0);
-		ZB_ERROR_CHECK(zb_err_code);
-	}
+	/* Schedle frame to send. */
+	p_reply->packet_info.buffer = bufid;
+	p_reply->packet_info.ptr = p_cmd_buf;
+	p_reply->packet_info.dst_addr =
+		(zb_addr_u *)(&(p_reply->remote_short_addr));
+	p_reply->packet_info.dst_addr_mode =
+		ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+	p_reply->packet_info.dst_ep = cli_ep;
+	p_reply->packet_info.ep = cli_ep;
+	p_reply->packet_info.prof_id = ZB_AF_HA_PROFILE_ID;
+	p_reply->packet_info.cluster_id = PING_CUSTOM_CLUSTER;
+	p_reply->packet_info.cb = frame_acked_cb;
+	p_reply->packet_info.disable_aps_ack =
+		(p_reply->send_ack ? ZB_FALSE : ZB_TRUE);
 
-	/* We don't need the row in this table anymore,
-	 * since we're not expecting any reply to a Ping Reply.
-	 */
-	ping_release_reply(p_reply);
+	zb_err_code = zigbee_schedule_callback2(zb_zcl_send_ping_frame,
+						(p_reply -
+						 m_ping_reply_table),
+						ZB_FALSE);
+	if (zb_err_code != RET_OK) {
+		print_error(p_reply->shell,
+				"Can not schedule zcl frame.",
+				ZB_FALSE);
+		ping_release_reply(p_reply);
+	}
 }
 
 /**@brief Indicate ping request reception.
@@ -532,10 +573,10 @@ static void ping_req_indicate(zb_bufid_t zcl_cmd_bufid)
 		return;
 	}
 
-	tmp_request.taken    = ZB_TRUE;
-	tmp_request.ping_seq = p_cmd_info->seq_number;
-	tmp_request.count    = zb_buf_len(zcl_cmd_bufid);
-	tmp_request.sent     = abs_time_now();
+	atomic_set(&tmp_request.taken, ZB_TRUE);
+	tmp_request.ping_seq  = p_cmd_info->seq_number;
+	tmp_request.count     = zb_buf_len(zcl_cmd_bufid);
+	tmp_request.sent_time = k_uptime_ticks();
 
 	if (remote_node_addr.addr_type != ZB_ZCL_ADDR_TYPE_SHORT) {
 		LOG_INF("Ping request received, but indication will not be generated due to the unsupported address type.");
@@ -547,7 +588,7 @@ static void ping_req_indicate(zb_bufid_t zcl_cmd_bufid)
 
 	mp_ping_ind_cb(
 		PING_EVT_REQUEST_RECEIVED,
-		ZB_TIME_BEACON_INTERVAL_TO_USEC(tmp_request.sent.time_zb),
+		k_ticks_to_us_near32(tmp_request.sent_time),
 		&tmp_request);
 }
 
@@ -598,7 +639,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 			return ZB_FALSE;
 		}
 
-		/* Catch the timers value. */
+		/* Catch the timer value. */
 		time_diff = get_request_duration(p_request);
 
 		/* Cancel the ongoing alarm which was to erase the row ... */
@@ -693,7 +734,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
  *
  * See the following flow graphs for details.
  *
- * - <b>Case 1:</b> Ping with echo, without the APS acknowledgment (default mode):
+ * - <b>Case 1:</b> Ping with echo, without the APS ack (default mode):
  *   @code
  *       App 1          Node 1                 Node 2
  *         |  -- ping ->  |  -- ping request ->  |   (command ID: 0x02 - ping request without the APS acknowledgment)
@@ -703,7 +744,11 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
  *         |  <- Done --  |                      |
  *   @endcode
  *
- *   In this default mode, the `ping` command measures the time needed for a Zigbee frame to travel between two nodes in the network (there and back again). The command uses a custom "overloaded" ZCL frame, which is constructed as a ZCL frame of the new custom ping ZCL cluster (ID 64).
+ *   In this default mode, the `ping` command measures the time needed
+ *   for a Zigbee frame to travel between two nodes in the network
+ *   (there and back again). The command uses a custom "overloaded" ZCL frame,
+ *   which is constructed as a ZCL frame of the new custom ping
+ *   ZCL cluster (ID 64).
  *
  * - <b>Case 2:</b> Ping with echo, with the APS acknowledgment:
  *     @code
@@ -781,7 +826,7 @@ int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 		p_row->count = PING_MAX_LENGTH;
 	}
 
-	/* Put the CLI instance to be used later. */
+	/* Put the shell instance to be used later. */
 	p_row->shell = (const struct shell*)shell;
 
 	ping_request_send(p_row);

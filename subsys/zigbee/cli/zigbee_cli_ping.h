@@ -11,6 +11,7 @@
 
 #include <zboss_api.h>
 #include <zboss_api_addons.h>
+#include "zigbee_cli_cmd_zcl.h"
 
 #define PING_CUSTOM_CLUSTER           0xBEEF
 #define PING_MAX_LENGTH               79
@@ -41,7 +42,8 @@ typedef enum {
 	 */
 	PING_EVT_FRAME_SENT,
 	/* PING received was received. This event is passed only
-	 * to the callback registered via @p zb_ping_set_ping_indication_cb. */
+	 * to the callback registered via @p zb_ping_set_ping_indication_cb.
+	 */
 	PING_EVT_REQUEST_RECEIVED,
 	/* An error occured during sending PING request. */
 	PING_EVT_ERROR,
@@ -53,21 +55,12 @@ typedef struct ping_request_s ping_request_t;
 /**@brief  Ping event callback definition.
  *
  * @param[in] evt_type  Type of received  ping acknowledgment
- * @param[in] delay_us  Time, in microseconds, between ping request
+ * @param[in] delay_ms  Time, in miliseconds, between ping request
  *                      and the event.
  * @param[in] p_row     Pointer to the ping request structure.
  */
-typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_us,
+typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_ms,
 	      ping_request_t * p_request);
-
-/**@brief The structure holds the BI interval value of ZBOSS timer
- *        and the value of the underlying 1MHz timer. Both combined give us the
- *        reliable way of measuring the time passed.
- */
-typedef struct time_abs_s {
-	zb_time_t   time_zb;
-	zb_uint32_t time_tim;
-} time_abs_t;
 
 /**@brief The row of the table which holds the requests which were sent.
  *
@@ -76,7 +69,7 @@ typedef struct time_abs_s {
  *          The key parameter is the sequence number.
  */
 struct ping_request_s {
-	zb_bool_t             taken;
+	atomic_t              taken;
 	zb_addr_u             remote_addr;
 	zb_uint8_t            remote_addr_mode;
 	zb_uint8_t            ping_seq;
@@ -84,15 +77,16 @@ struct ping_request_s {
 	zb_uint8_t            request_echo;
 	zb_uint16_t           count;
 	zb_uint16_t           timeout_ms;
-	volatile time_abs_t   sent;
+	volatile s64_t        sent_time;
 	const struct shell    *shell;
+	zcl_packet_info_t     packet_info;
 	ping_time_cb_t        p_cb;
 };
 
 /**@brief Set ping request indication callback.
  *
- * @note The @p p_cb argument delay_us will reflect current time
- *       in microseconds.
+ * @note The @p p_cb argument delay_ms will reflect current time
+ *       in miliseconds.
  */
 void zb_ping_set_ping_indication_cb(ping_time_cb_t p_cb);
 

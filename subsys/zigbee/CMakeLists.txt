@@ -37,5 +37,6 @@ zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_bdb.c)
 zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_generic_cmd.c)
 zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_zdo.c)
 zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_zscheduler.c)
+zephyr_library_sources_ifdef(CONFIG_ZIGBEE_CLI_SHELL cli/zigbee_cli_cmd_radio.c)
 
 zephyr_library_link_libraries(zboss)
