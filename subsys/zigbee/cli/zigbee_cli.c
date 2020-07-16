@@ -16,7 +16,7 @@
 #include "zigbee_cli.h"
 
 /* CLI Agent endpoint, by default set to greatest endpoint number. */
-static zb_uint8_t cli_ep = 254;
+static zb_uint8_t cli_ep = ZB_MAX_ENDPOINT_NUMBER;
 
 /* Zigbee cli debug mode indicator. */
 static zb_bool_t m_debug_mode = ZB_FALSE;
@@ -109,8 +109,16 @@ zb_void_t zb_set_cli_endpoint(zb_uint8_t ep)
  */
 zb_void_t zb_set_default_cli_endpoint(zb_void_t)
 {
-	zb_uint8_t ep_to_set = 0xFF;
+	/* Set to maximum endpoint number. */
+	zb_uint8_t ep_to_set = ZB_MAX_ENDPOINT_NUMBER;
 	zb_zcl_globals_t *p_zcl_ctx = zb_zcl_get_ctx();
+
+	/* Check if cli endpoint has been changed and if not, set default value
+	 * of cli endpoint.
+	 */
+	if (zb_get_cli_endpoint() != ep_to_set) {
+		return;
+	}
 
 	/* Iterate over all endpoints present in ZCL ctx to find
 	 * endpoint with lowest number.
@@ -122,7 +130,8 @@ zb_void_t zb_set_default_cli_endpoint(zb_void_t)
 		 * - not a ZDO endpoint (temp_ep != 0)
 		 * - not a reserved value (temp_ep < 241)
 		 */
-		if ((temp_ep == 0) || (temp_ep >= 241)) {
+		if ((temp_ep < ZB_MIN_ENDPOINT_NUMBER) ||
+		    (temp_ep <= ZB_MAX_ENDPOINT_NUMBER)) {
 			continue;
 		}
 		if (temp_ep < ep_to_set) {
