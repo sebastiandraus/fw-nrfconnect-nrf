@@ -43,7 +43,7 @@ LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 static int zb_cli_init(struct device *unused)
 {
 #ifdef CONFIG_ZIGBEE_SHELL_PROMPT
-	zb_set_cli_shell_prompt(CONFIG_ZIGBEE_SHELL_PROMPT);
+	zb_set_cli_default_shell_prompt(CONFIG_ZIGBEE_SHELL_PROMPT);
 #endif
 
 	return 0;
@@ -53,14 +53,22 @@ static int zb_cli_init(struct device *unused)
  *
  * @param[in] new_prompt  Pointer to new cli shell prompt.
  */
-void zb_set_cli_shell_prompt(const char *new_prompt)
+void zb_set_cli_default_shell_prompt(const char *new_prompt)
 {
 #ifdef CONFIG_SHELL_BACKEND_SERIAL
 	if(shell_prompt_change(shell_backend_uart_get_ptr(), new_prompt)) {
 		LOG_ERR("Can not change shell prompt");
 	}
-#else
-	LOG_ERR("Selected shell is not supported.");
+#endif
+#ifdef CONFIG_SHELL_BACKEND_RTT
+	if(shell_prompt_change(shell_backend_uart_get_ptr(), new_prompt)) {
+		LOG_ERR("Can not change shell prompt");
+	}
+#endif
+#ifdef CONFIG_SHELL_BACKEND_TELNET
+	if(shell_prompt_change(shell_backend_uart_get_ptr(), new_prompt)) {
+		LOG_ERR("Can not change shell prompt");
+	}
 #endif
 }
 

@@ -17,7 +17,7 @@
  *
  * @param[in] new_prompt  Pointer to new cli shell prompt.
  */
-void zb_set_cli_shell_prompt(const char *new_prompt);
+void zb_set_cli_default_shell_prompt(const char *new_prompt);
 
 /**@brief Mark current shell command as processed by giving semaphore.
  */
