@@ -10,6 +10,7 @@
 #include <init.h>
 #include <shell/shell.h>
 #include <shell/shell_uart.h>
+#include <shell/shell_rtt.h>
 
 #include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
@@ -61,12 +62,7 @@ void zb_set_cli_default_shell_prompt(const char *new_prompt)
 	}
 #endif
 #ifdef CONFIG_SHELL_BACKEND_RTT
-	if(shell_prompt_change(shell_backend_uart_get_ptr(), new_prompt)) {
-		LOG_ERR("Can not change shell prompt");
-	}
-#endif
-#ifdef CONFIG_SHELL_BACKEND_TELNET
-	if(shell_prompt_change(shell_backend_uart_get_ptr(), new_prompt)) {
+	if(shell_prompt_change(shell_backend_rtt_get_ptr(), new_prompt)) {
 		LOG_ERR("Can not change shell prompt");
 	}
 #endif
