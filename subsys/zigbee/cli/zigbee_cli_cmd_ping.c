@@ -217,6 +217,7 @@ static void zb_zcl_send_ping_frame(zb_uint8_t idx, zb_uint16_t is_request)
 		if (zb_err_code != RET_OK) {
 			print_error(p_request->shell,
 				    "Can not send zcl frame", ZB_FALSE);
+			zb_buf_free(packet_info->buffer);
 			zb_ping_release_request(p_request);
 			return;
 		}
@@ -240,8 +241,9 @@ static void zb_zcl_send_ping_frame(zb_uint8_t idx, zb_uint16_t is_request)
 		}
 	} else {
 		if (zb_err_code != RET_OK) {
-		print_error(m_ping_reply_table[idx].shell,
-			    "Can not send zcl frame", ZB_FALSE);
+			print_error(m_ping_reply_table[idx].shell,
+				    "Can not send zcl frame", ZB_FALSE);
+			zb_buf_free(packet_info->buffer);
 		}
 		/* We don't need the row in this table anymore,
 		 * since we're not expecting any reply to a Ping Reply.
@@ -478,6 +480,7 @@ zb_void_t ping_request_send(ping_request_t * p_request)
 		print_error(p_request->shell,
 				"Can not schedule zcl frame.",
 				ZB_FALSE);
+		zb_buf_free(p_request->packet_info.buffer);
 		zb_ping_release_request(p_request);
 		return;
 	}
@@ -509,7 +512,7 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 	memset(p_cmd_buf, PING_ECHO_REPLY_BYTE, p_reply->count);
 	p_cmd_buf += p_reply->count;
 
-	/* Schedle frame to send. */
+	/* Schedule frame to send. */
 	p_reply->packet_info.buffer = bufid;
 	p_reply->packet_info.ptr = p_cmd_buf;
 	p_reply->packet_info.dst_addr =
@@ -532,6 +535,7 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 		print_error(p_reply->shell,
 				"Can not schedule zcl frame.",
 				ZB_FALSE);
+		zb_buf_free(p_reply->packet_info.buffer);
 		ping_release_reply(p_reply);
 	}
 }
