@@ -18,13 +18,6 @@
 /* CLI Agent endpoint, by default set to greatest endpoint number. */
 static zb_uint8_t cli_ep = 254;
 
-#ifndef DEVELOPMENT_TODO
-#error "Do we need app timer here?"
-// TODO: VERiFY IF NEEDED
-/* Counter timer. */
-APP_TIMER_DEF(m_timer_0);
-#endif
-
 /* Zigbee cli debug mode indicator. */
 static zb_bool_t m_debug_mode = ZB_FALSE;
 
