@@ -272,6 +272,7 @@ static void zboss_thread(void *arg1, void *arg2, void *arg3)
 
 #ifdef CONFIG_ZIGBEE_CLI_SHELL
 	zb_cli_set_stack_as_started();
+	zb_set_default_cli_endpoint();
 #endif /* defined(CONFIG_ZIGBEE_CLI_SHELL) */
 
 	while (1) {

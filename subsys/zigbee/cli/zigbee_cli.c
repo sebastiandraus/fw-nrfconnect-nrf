@@ -15,8 +15,8 @@
 #include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 
-/* CLI Agent endpoint. */
-static zb_uint8_t cli_ep;
+/* CLI Agent endpoint, by default set to greatest endpoint number. */
+static zb_uint8_t cli_ep = 254;
 
 #ifndef DEVELOPMENT_TODO
 #error "Do we need app timer here?"
@@ -109,6 +109,36 @@ zb_uint8_t zb_get_cli_endpoint(void)
 zb_void_t zb_set_cli_endpoint(zb_uint8_t ep)
 {
 	cli_ep = ep;
+}
+
+/**@brief Scans ZCL context to find endpoint which can be used to send
+ *        ZCL frames. By default tries to find the lowest number endpoint.
+ */
+zb_void_t zb_set_default_cli_endpoint(zb_void_t)
+{
+	zb_uint8_t ep_to_set = 0xFF;
+	zb_zcl_globals_t *p_zcl_ctx = zb_zcl_get_ctx();
+
+	/* Iterate over all endpoints present in ZCL ctx to find
+	 * endpoint with lowest number.
+	 */
+	for (u8_t index = 0; index < p_zcl_ctx->device_ctx->ep_count; index++) {
+		zb_uint8_t temp_ep =
+			p_zcl_ctx->device_ctx->ep_desc_list[index]->ep_id;
+		/* Validate endpoint numeber:
+		 * - not a ZDO endpoint (temp_ep != 0)
+		 * - not a reserved value (temp_ep < 241)
+		 */
+		if ((temp_ep == 0) || (temp_ep >= 241)) {
+			continue;
+		}
+		if (temp_ep < ep_to_set) {
+			ep_to_set = temp_ep;
+		}
+	}
+	if (ep_to_set != 0xFF) {
+		zb_set_cli_endpoint(ep_to_set);
+	}
 }
 
 /**@brief Sets the debug mode.
