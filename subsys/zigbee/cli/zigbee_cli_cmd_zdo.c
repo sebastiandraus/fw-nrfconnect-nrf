@@ -599,7 +599,7 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli->zdo_req.ctx_timeout = 0;
 	p_tsn_cli->zdo_req.timeout_cb_fn = NULL;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					      (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -677,7 +677,7 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc,
 	p_tsn_cli->zdo_req.ctx_timeout = 0;
 	p_tsn_cli->zdo_req.timeout_cb_fn = NULL;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -884,7 +884,7 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc,
 
 	shell_print(shell, "Sending %s request.",
 		    p_tsn_cli->is_broadcast ? "broadcast" : "unicast");
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -1009,7 +1009,7 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_BIND_RESP_TIMEOUT;
 	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_bind_unbind_timeout;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -1085,7 +1085,7 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_NWK_ADDR_RESP_TIMEOUT;
 	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_nwk_addr_timeout;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request",
@@ -1156,7 +1156,7 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_IEEE_ADDR_RESP_TIMEOUT;
 	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_ieee_addr_timeout;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -1450,7 +1450,7 @@ static int cmd_zb_mgmt_leave(const struct shell *shell, size_t argc,
 	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT;
 	p_tsn_cli->zdo_req.timeout_cb_fn = cmd_zb_mgmt_leave_timeout_cb;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -1825,7 +1825,7 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_ctx->zdo_req.ctx_timeout = 0;
 	p_tsn_ctx->zdo_req.timeout_cb_fn = NULL;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_ctx - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
@@ -1984,7 +1984,7 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli->zdo_req.ctx_timeout = ZIGBEE_CLI_MGMT_LEAVE_RESP_TIMEOUT;
 	p_tsn_cli->zdo_req.timeout_cb_fn = ctx_timeout_cb;
 
-	zb_err_code = zigbee_schedule_callback(zb_zdo_req,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zb_zdo_req,
 					       (p_tsn_cli - m_tsn_ctx));
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);

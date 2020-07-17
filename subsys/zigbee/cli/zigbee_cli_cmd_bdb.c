@@ -517,7 +517,7 @@ static int cmd_zb_legacy(const struct shell *shell, size_t argc, char **argv)
 			print_error(shell, "Unrecognized option", ZB_FALSE);
 			return -EINVAL;
 		}
-		if (zigbee_schedule_callback(zb_bdb_set_legacy_device_support,
+		if (ZB_SCHEDULE_APP_CALLBACK(zb_bdb_set_legacy_device_support,
 					     m_legacy_mode)) {
 			print_error(shell, "Can not execute command", ZB_FALSE);
 			return -ENOEXEC;

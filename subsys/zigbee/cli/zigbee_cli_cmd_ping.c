@@ -471,7 +471,7 @@ zb_void_t ping_request_send(ping_request_t * p_request)
 	p_request->packet_info.disable_aps_ack =
 		(p_request->request_ack ? ZB_FALSE : ZB_TRUE);
 
-	zb_err_code = zigbee_schedule_callback2(zb_zcl_send_ping_frame,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK2(zb_zcl_send_ping_frame,
 						get_request_row(p_request),
 						ZB_TRUE);
 	if (zb_err_code != RET_OK) {
@@ -523,7 +523,7 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 	p_reply->packet_info.disable_aps_ack =
 		(p_reply->send_ack ? ZB_FALSE : ZB_TRUE);
 
-	zb_err_code = zigbee_schedule_callback2(zb_zcl_send_ping_frame,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK2(zb_zcl_send_ping_frame,
 						(p_reply -
 						 m_ping_reply_table),
 						ZB_FALSE);

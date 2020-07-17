@@ -389,7 +389,7 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	p_row->packet_info.cb = frame_acked_cb;
 	p_row->packet_info.disable_aps_ack = ZB_FALSE;
 
-	zb_err_code = zigbee_schedule_callback(read_write_attr_send, row);
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(read_write_attr_send, row);
 
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
@@ -508,7 +508,7 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	p_row->packet_info.cb = frame_acked_cb;
 	p_row->packet_info.disable_aps_ack = ZB_FALSE;
 
-	zb_err_code = zigbee_schedule_callback(read_write_attr_send, row);
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(read_write_attr_send, row);
 
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);

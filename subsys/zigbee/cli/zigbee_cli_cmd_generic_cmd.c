@@ -346,7 +346,7 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	p_cmd_data->packet_info.cb = NULL;
 	p_cmd_data->packet_info.disable_aps_ack = ZB_FALSE;
 
-	zb_err_code = zigbee_schedule_callback(zcl_cmd_send, table_row);
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zcl_cmd_send, table_row);
 
 	if (zb_err_code != RET_OK) {
 		print_error(p_cmd_data->shell, "Can not schedule ZCL frame",
@@ -497,7 +497,7 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	p_cmd_data->packet_info.cb = NULL;
 	p_cmd_data->packet_info.disable_aps_ack = ZB_FALSE;
 
-	zb_err_code = zigbee_schedule_callback(zcl_cmd_send, table_row);
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(zcl_cmd_send, table_row);
 
 	if (zb_err_code != RET_OK) {
 		print_error(p_cmd_data->shell, "Can not schedule ZCL frame",
