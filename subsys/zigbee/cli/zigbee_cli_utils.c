@@ -42,8 +42,8 @@ zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid)
 //TODO: REMOVE
 #endif
 
-int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
-		    zb_uint8_t * p_attr)
+int zcl_attr_to_str(char *p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
+		    zb_uint8_t *p_attr)
 {
 	int bytes_written = 0;
 	int string_len;
@@ -134,7 +134,7 @@ int zcl_attr_to_str(char * p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 	return bytes_written;
 }
 
-int sscan_uint8(const char * p_bp, u8_t * p_u8)
+int sscan_uint8(const char *p_bp, u8_t *p_u8)
 {
 	/* strtoul() used as a replacement for lacking sscanf(),
 	 * first character is tested to make sure that is a digit.
@@ -182,7 +182,7 @@ int sscan_uint(const char *p_bp, u8_t *p_value, u8_t size, u8_t base)
 	return 1;
 }
 
-void print_hexdump(const struct shell *shell, const u8_t * p_in, u8_t size,
+void print_hexdump(const struct shell *shell, const u8_t *p_in, u8_t size,
 		   bool reverse)
 {
 	char addr_buf[2 * size + 1];

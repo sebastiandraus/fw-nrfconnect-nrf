@@ -110,7 +110,7 @@ static zb_void_t frame_acked_cb(zb_bufid_t bufid)
  *
  * @return Whether it is response or not.
  */
-static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, attr_query_t * p_row)
+static zb_bool_t is_response(zb_zcl_parsed_hdr_t *p_hdr, attr_query_t *p_row)
 {
 	zb_uint16_t remote_node_short = 0;
 	if (p_row->packet_info.dst_addr_mode ==
@@ -158,9 +158,9 @@ static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, attr_query_t * p_row)
  * @param bufid     Zigbee buffer ID with Read Attribute Response packet.
  * @param p_row     Pointer to a row in attr table.
  */
-static void print_read_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
+static void print_read_attr_response(zb_bufid_t bufid, attr_query_t *p_row)
 {
-	zb_zcl_read_attr_res_t * p_attr_resp;
+	zb_zcl_read_attr_res_t *p_attr_resp;
 	/* Get the contents of Read Attribute Response frame. */
 	ZB_ZCL_GENERAL_GET_NEXT_READ_ATTR_RES(bufid, p_attr_resp);
 	if (p_attr_resp->status == ZB_ZCL_STATUS_SUCCESS) {
@@ -189,9 +189,9 @@ static void print_read_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
  * @param bufid     Zigbee buffer ID with Write Attribute Response packet.
  * @param p_row     Pointer to a row in attr table.
  */
-static void print_write_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
+static void print_write_attr_response(zb_bufid_t bufid, attr_query_t *p_row)
 {
-	zb_zcl_write_attr_res_t * p_attr_resp;
+	zb_zcl_write_attr_res_t *p_attr_resp;
 	/* Get the contents of Write Attribute Response frame. */
 	ZB_ZCL_GET_NEXT_WRITE_ATTR_RES(bufid, p_attr_resp);
 
@@ -216,7 +216,7 @@ static void print_write_attr_response(zb_bufid_t bufid, attr_query_t * p_row)
  */
 static zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid)
 {
-	zb_zcl_parsed_hdr_t * p_cmd_info;
+	zb_zcl_parsed_hdr_t *p_cmd_info;
 	zb_int8_t row;
 
 	p_cmd_info = ZB_BUF_GET_PARAM(bufid, zb_zcl_parsed_hdr_t);
@@ -227,13 +227,13 @@ static zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid)
 		return ZB_FALSE;
 	}
 
-	attr_query_t * p_row = &(m_attr_table[row]);
+	attr_query_t *p_row = &(m_attr_table[row]);
 	if (!is_response(p_cmd_info, p_row)) {
 		return ZB_FALSE;
 	}
 
 	if (p_cmd_info->cmd_id == ZB_ZCL_CMD_DEFAULT_RESP) {
-		zb_zcl_default_resp_payload_t * p_def_resp;
+		zb_zcl_default_resp_payload_t *p_def_resp;
 		p_def_resp = ZB_ZCL_READ_DEFAULT_RESP(bufid);
 		shell_error(p_row->shell, "Error: Default Response received; ");
 		shell_error(p_row->shell, "Command: %d, Status: %d ",
@@ -434,7 +434,7 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 		return -ENOEXEC;
 	}
 
-	attr_query_t * p_row = &(m_attr_table[row]);
+	attr_query_t *p_row = &(m_attr_table[row]);
 
 	p_row->packet_info.dst_addr_mode = parse_address(
 						*(++argv),

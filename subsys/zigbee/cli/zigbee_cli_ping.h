@@ -60,7 +60,7 @@ typedef struct ping_request_s ping_request_t;
  * @param[in] p_row     Pointer to the ping request structure.
  */
 typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_ms,
-	      ping_request_t * p_request);
+	      ping_request_t *p_request);
 
 /**@brief The row of the table which holds the requests which were sent.
  *
@@ -92,18 +92,18 @@ void zb_ping_set_ping_indication_cb(ping_time_cb_t p_cb);
  *
  * @return  Pointer to a free ping request context or NULL on failure.
  */
-ping_request_t * zb_ping_acquire_request(void);
+ping_request_t *zb_ping_acquire_request(void);
 
 /**@brief Release ping request context.
  *
  * @param p_request Pointer to the context structure to release.
  */
-zb_void_t zb_ping_release_request(ping_request_t * p_request);
+zb_void_t zb_ping_release_request(ping_request_t *p_request);
 
 /**@brief Actually construct the Ping Request frame and send it.
  *
  * @param p_request  Pointer to the ping request context structure.
  */
-zb_void_t ping_request_send(ping_request_t * p_request);
+zb_void_t ping_request_send(ping_request_t *p_request);
 
 #endif /* ZIGBEE_CLI_PING_H__ */

@@ -133,12 +133,12 @@ static void cmd_zb_subscribe_unsubscribe_timeout(u8_t tsn)
  * @param p_tsn_ctx[in]     Pointer to context structure
  * @param bufid[in]         ZBOSS buffer id
  */
-static void cmd_zb_subscribe_unsubscribe_cb(tsn_ctx_t * p_tsn_ctx,
+static void cmd_zb_subscribe_unsubscribe_cb(tsn_ctx_t *p_tsn_ctx,
 					    zb_bufid_t bufid)
 {
-	zb_ret_t                           zb_err_code;
-	zb_zcl_configure_reporting_res_t * p_resp = NULL;
-	zb_bool_t                          failed = ZB_FALSE;
+	zb_ret_t                          zb_err_code;
+	zb_zcl_configure_reporting_res_t *p_resp = NULL;
+	zb_bool_t                         failed = ZB_FALSE;
 
 	zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(
 			cmd_zb_subscribe_unsubscribe_timeout,

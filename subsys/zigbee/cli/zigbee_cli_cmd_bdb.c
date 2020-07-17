@@ -390,7 +390,7 @@ static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
 static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 			       char **argv)
 {
-	const char *   p_err_msg = NULL;
+	const char     *p_err_msg = NULL;
 	zb_ieee_addr_t addr;
 	/* +2 for CRC16. */
 	zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2];

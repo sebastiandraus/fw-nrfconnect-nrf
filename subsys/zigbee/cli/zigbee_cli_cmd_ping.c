@@ -44,9 +44,9 @@ static ping_reply_t   m_ping_reply_table[PING_TABLE_SIZE];
 static u8_t           m_ping_seq_num;
 static ping_time_cb_t mp_ping_ind_cb = NULL;
 
-static zb_uint32_t get_request_duration(ping_request_t * p_request);
+static zb_uint32_t get_request_duration(ping_request_t *p_request);
 
-ping_request_t * zb_ping_acquire_request(void)
+ping_request_t *zb_ping_acquire_request(void)
 {
 	int i;
 	for (i = 0; i < PING_TABLE_SIZE; i++) {
@@ -59,7 +59,7 @@ ping_request_t * zb_ping_acquire_request(void)
 	return NULL;
 }
 
-zb_void_t zb_ping_release_request(ping_request_t * p_reply)
+zb_void_t zb_ping_release_request(ping_request_t *p_reply)
 {
 	if (p_reply != NULL) {
 		atomic_set(&p_reply->taken, ZB_FALSE);
@@ -71,7 +71,7 @@ zb_void_t zb_ping_release_request(ping_request_t * p_reply)
  *
  * @return  Pointer to a free ping reply context or NULL on failure.
  */
-static ping_reply_t * ping_aquire_reply(void)
+static ping_reply_t *ping_aquire_reply(void)
 {
 	int i;
 
@@ -89,7 +89,7 @@ static ping_reply_t * ping_aquire_reply(void)
  *
  * @param p_reply Pointer to the reply context structure to release.
  */
-zb_void_t ping_release_reply(ping_reply_t * p_reply)
+zb_void_t ping_release_reply(ping_reply_t *p_reply)
 {
 	if (p_reply != NULL) {
 		atomic_set(&p_reply->taken, ZB_FALSE);
@@ -103,8 +103,8 @@ zb_void_t ping_release_reply(ping_reply_t * p_reply)
  */
 static zb_void_t invalidate_row_cb(zb_uint8_t row)
 {
-	ping_request_t * p_request = &(m_ping_request_table[row]);
-	u32_t            delay_ms = get_request_duration(p_request);
+	ping_request_t *p_request = &(m_ping_request_table[row]);
+	u32_t          delay_ms = get_request_duration(p_request);
 
 	/* Inform user about timeout event. */
 	if (p_request->p_cb) {
@@ -151,7 +151,7 @@ static ping_request_t *find_request_by_short(zb_uint16_t addr_short)
  *
  * @param seqnum Sequence Number to look for
  */
-static ping_request_t * find_request_by_sn(zb_uint8_t seqnum)
+static ping_request_t *find_request_by_sn(zb_uint8_t seqnum)
 {
 	int i;
 
@@ -172,7 +172,7 @@ static ping_request_t * find_request_by_sn(zb_uint8_t seqnum)
  *
  * @return Row number, -1 if not found.
  */
-static zb_int8_t get_request_row(ping_request_t * p_request)
+static zb_int8_t get_request_row(ping_request_t *p_request)
 {
 	if (p_request != NULL) {
 		return (p_request - m_ping_request_table);
@@ -259,7 +259,7 @@ static void zb_zcl_send_ping_frame(zb_uint8_t idx, zb_uint16_t is_request)
  *
  * @return  Time difference in miliseconds.
  */
-static zb_uint32_t get_request_duration(ping_request_t * p_request)
+static zb_uint32_t get_request_duration(ping_request_t *p_request)
 {
 	u32_t time_diff_ms;
 	s32_t time_diff_ticks;
@@ -290,9 +290,9 @@ static zb_void_t frame_acked_cb(zb_bufid_t bufid)
 static zb_void_t dispatch_user_callback(zb_bufid_t bufid)
 {
 	zb_uint16_t                    short_addr;
-	zb_zcl_command_send_status_t * p_cmd_ping_status;
+	zb_zcl_command_send_status_t   *p_cmd_ping_status;
 	zb_ret_t                       zb_err_code = RET_OK;
-	ping_request_t               * p_request = NULL;
+	ping_request_t                 *p_request = NULL;
 
 	if (bufid == 0) {
 		return;
@@ -362,7 +362,7 @@ static zb_void_t dispatch_user_callback(zb_bufid_t bufid)
  * @param[in] p_request Pointer to the ongoing ping request context structure.
  */
 static void ping_cli_evt_handler(ping_time_evt_t evt, zb_uint32_t delay_ms,
-				 ping_request_t * p_request)
+				 ping_request_t *p_request)
 {
 	switch (evt) {
 	case PING_EVT_FRAME_SCHEDULED:
@@ -409,12 +409,12 @@ void zb_ping_set_ping_indication_cb(ping_time_cb_t p_cb)
 	mp_ping_ind_cb = p_cb;
 }
 
-zb_void_t ping_request_send(ping_request_t * p_request)
+zb_void_t ping_request_send(ping_request_t *p_request)
 {
 	zb_uint8_t   cli_ep = zb_get_cli_endpoint();
 	zb_ret_t     zb_err_code;
 	zb_bufid_t   bufid;
-	zb_uint8_t * p_cmd_buf;
+	zb_uint8_t   *p_cmd_buf;
 
 	if (p_request->count > PING_MAX_LENGTH) {
 		if (p_request->p_cb) {
@@ -488,10 +488,10 @@ zb_void_t ping_request_send(ping_request_t * p_request)
  *
  * @param p_row  Pointer to the ping reply context structure.
  */
-static zb_void_t ping_reply_send(ping_reply_t * p_reply)
+static zb_void_t ping_reply_send(ping_reply_t *p_reply)
 {
 	zb_bufid_t   bufid;
-	zb_uint8_t * p_cmd_buf;
+	zb_uint8_t   *p_cmd_buf;
 	zb_uint8_t   cli_ep = zb_get_cli_endpoint();
 	zb_ret_t     zb_err_code;
 
@@ -619,7 +619,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 		zb_uint16_t remote_short_addr = 0x0000;
 
 		/* We have our ping reply. */
-		ping_request_t * p_request = find_request_by_sn(
+		ping_request_t *p_request = find_request_by_sn(
 						p_cmd_info->seq_number);
 		if (p_request == NULL) {
 			return ZB_FALSE;
@@ -787,8 +787,8 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
  */
 int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 {
-	ping_request_t * p_row;
-	u8_t          i;
+	ping_request_t *p_row;
+	u8_t           i;
 
 	p_row = zb_ping_acquire_request();
 	if (p_row == NULL) {

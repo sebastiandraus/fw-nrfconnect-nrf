@@ -108,7 +108,7 @@ static int cmd_zb_fem(const struct shell *shell, size_t argc, char **argv)
  * @note The FEM configuration may be applied only before the FEM control
  *       lines are enabled.
  */
-static int cmd_zb_fem_line(const struct shell *shell, const char * p_line,
+static int cmd_zb_fem_line(const struct shell *shell, const char *p_line,
 			   size_t argc, char **argv)
 {
 #ifndef ENABLE_FEM
