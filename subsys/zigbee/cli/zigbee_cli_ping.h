@@ -70,8 +70,6 @@ typedef void (*ping_time_cb_t)(ping_time_evt_t evt, zb_uint32_t delay_ms,
  */
 struct ping_request_s {
 	atomic_t              taken;
-	zb_addr_u             remote_addr;
-	zb_uint8_t            remote_addr_mode;
 	zb_uint8_t            ping_seq;
 	zb_uint8_t            request_ack;
 	zb_uint8_t            request_echo;

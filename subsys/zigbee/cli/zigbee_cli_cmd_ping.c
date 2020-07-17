@@ -31,7 +31,6 @@ LOG_MODULE_REGISTER(LOG_SUBMODULE_NAME, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
  */
 typedef struct ping_reply_s {
 	atomic_t            taken;
-	zb_uint16_t         remote_short_addr;
 	zb_uint8_t          ping_seq;
 	zb_uint8_t          count;
 	zb_uint8_t          send_ack;
@@ -121,16 +120,16 @@ static zb_void_t invalidate_row_cb(zb_uint8_t row)
  *
  * @return  Pointer to the ping request context, NULL if none.
  */
-static ping_request_t * find_request_by_short(zb_uint16_t addr_short)
+static ping_request_t *find_request_by_short(zb_uint16_t addr_short)
 {
 	int i;
 	zb_addr_u req_remote_addr;
 
 	for (i = 0; i < PING_TABLE_SIZE; i++) {
-		req_remote_addr = m_ping_request_table[i].remote_addr;
+		req_remote_addr = m_ping_request_table[i].packet_info.dst_addr;
 
 		if (atomic_get(&m_ping_request_table[i].taken) == ZB_TRUE) {
-			if (m_ping_request_table[i].remote_addr_mode ==
+			if (m_ping_request_table[i].packet_info.dst_addr_mode ==
 			    ZB_APS_ADDR_MODE_16_ENDP_PRESENT) {
 				if (req_remote_addr.addr_short == addr_short) {
 					return &(m_ping_request_table[i]);
@@ -463,8 +462,7 @@ zb_void_t ping_request_send(ping_request_t * p_request)
 	/* Schedle frame to send. */
 	p_request->packet_info.buffer = bufid;
 	p_request->packet_info.ptr = p_cmd_buf;
-	p_request->packet_info.dst_addr = p_request->remote_addr;
-	p_request->packet_info.dst_addr_mode = p_request->remote_addr_mode;
+	/* DstAddr and Addr mode already set. */
 	p_request->packet_info.dst_ep = cli_ep;
 	p_request->packet_info.ep = cli_ep;
 	p_request->packet_info.prof_id = ZB_AF_HA_PROFILE_ID;
@@ -515,10 +513,8 @@ static zb_void_t ping_reply_send(ping_reply_t * p_reply)
 	/* Schedule frame to send. */
 	p_reply->packet_info.buffer = bufid;
 	p_reply->packet_info.ptr = p_cmd_buf;
-	p_reply->packet_info.dst_addr =
-			(zb_addr_u)(p_reply->remote_short_addr);
-	p_reply->packet_info.dst_addr_mode =
-		ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+	/* DstAddr is already set. */
+	p_reply->packet_info.dst_addr_mode = ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
 	p_reply->packet_info.dst_ep = cli_ep;
 	p_reply->packet_info.ep = cli_ep;
 	p_reply->packet_info.prof_id = ZB_AF_HA_PROFILE_ID;
@@ -587,8 +583,10 @@ static void ping_req_indicate(zb_bufid_t zcl_cmd_bufid)
 		/* Not supported. */
 		return;
 	}
-	tmp_request.remote_addr_mode       = ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-	tmp_request.remote_addr.addr_short = remote_node_addr.u.short_addr;
+	tmp_request.packet_info.dst_addr_mode =
+					ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+	tmp_request.packet_info.dst_addr.addr_short =
+					remote_node_addr.u.short_addr;
 
 	mp_ping_ind_cb(
 		PING_EVT_REQUEST_RECEIVED,
@@ -627,12 +625,13 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 			return ZB_FALSE;
 		}
 
-		if (p_request->remote_addr_mode ==
+		if (p_request->packet_info.dst_addr_mode ==
 		    ZB_APS_ADDR_MODE_16_ENDP_PRESENT) {
-			remote_short_addr = p_request->remote_addr.addr_short;
+			remote_short_addr =
+				p_request->packet_info.dst_addr.addr_short;
 		} else {
 			remote_short_addr = zb_address_short_by_ieee(
-					      p_request->remote_addr.addr_long);
+				p_request->packet_info.dst_addr.addr_long);
 		}
 
 
@@ -668,8 +667,8 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 	} else if ((p_cmd_info->cmd_id == PING_ECHO_REQUEST) ||
 		   (p_cmd_info->cmd_id == PING_ECHO_NO_ACK_REQUEST)) {
 
-		zb_uint8_t     len = zb_buf_len(bufid);
-		ping_reply_t * p_reply = ping_aquire_reply();
+		zb_uint8_t    len = zb_buf_len(bufid);
+		ping_reply_t *p_reply = ping_aquire_reply();
 
 		if (p_reply == NULL) {
 			LOG_WRN("Cannot obtain new row for incoming ping request");
@@ -691,7 +690,7 @@ static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 		}
 
 		if (remote_node_addr.addr_type == ZB_ZCL_ADDR_TYPE_SHORT) {
-			p_reply->remote_short_addr =
+			p_reply->packet_info.dst_addr.addr_short =
 				remote_node_addr.u.short_addr;
 		} else {
 			LOG_WRN("Drop ping request due to incorrect address type");
@@ -810,10 +809,11 @@ int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
-	p_row->remote_addr_mode = parse_address(argv[argc - 2],
-						&(p_row->remote_addr),
+	p_row->packet_info.dst_addr_mode = parse_address(
+						argv[argc - 2],
+						&(p_row->packet_info.dst_addr),
 						ADDR_ANY);
-	if (p_row->remote_addr_mode == ADDR_INVALID) {
+	if (p_row->packet_info.dst_addr_mode == ADDR_INVALID) {
 		print_error(shell, "Wrong address format", ZB_FALSE);
 		zb_ping_release_request(p_row);
 		return -EINVAL;
