@@ -12,6 +12,7 @@
 #include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
+#include "zigbee_cli_cmd_zcl.h"
 
 /* Payload size in bytes, payload read from string is twice the size. */
 #define CMD_PAYLOAD_SIZE    25
@@ -22,17 +23,13 @@ LOG_MODULE_DECLARE(cli);
 
 /* Structure to store command's parameters to send. */
 typedef struct cmd_query_s {
-	zb_bool_t                           taken;
+	atomic_t                            taken;
 	zb_uint8_t                          seq_num;
-	zb_uint8_t                          remote_addr_mode;
-	zb_addr_u                           remote_node;
-	zb_uint8_t                          remote_ep;
-	zb_uint16_t                         profile_id;
-	zb_uint16_t                         cluster_id;
 	zb_uint8_t                          payload[CMD_PAYLOAD_SIZE];
 	zb_uint8_t                          payload_length;
 	zb_uint16_t                         cmd_id;
 	zb_zcl_disable_default_response_t   def_resp;
+	zcl_packet_info_t                   packet_info;
 	const struct shell                  *shell;
 } cmd_query_t;
 
@@ -49,8 +46,8 @@ static zb_int8_t acquire_row_table()
 {
 	int i;
 	for (i = 0; i < CMD_TABLE_SIZE; i++) {
-		if (m_cmd_data[i].taken == ZB_FALSE) {
-			m_cmd_data[i].taken = ZB_TRUE;
+		if (atomic_get(&m_cmd_data[i].taken) == ZB_FALSE) {
+			atomic_set(&m_cmd_data[i].taken, ZB_TRUE);
 			return i;
 		}
 	}
@@ -64,7 +61,7 @@ static zb_int8_t get_cmd_table_row_by_sn(zb_uint8_t sernum)
 {
 	int i;
 	for (i = 0; i < CMD_TABLE_SIZE; i++) {
-		if (m_cmd_data[i].taken == ZB_TRUE) {
+		if (atomic_get(&m_cmd_data[i].taken) == ZB_TRUE) {
 			if (m_cmd_data[i].seq_num == sernum) {
 				return i;
 			}
@@ -105,22 +102,26 @@ static zb_void_t invalidate_row_cb(zb_uint8_t row)
 static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, cmd_query_t * p_row)
 {
 	zb_uint16_t remote_node_short = 0;
-	if (p_row->remote_addr_mode == ZB_APS_ADDR_MODE_64_ENDP_PRESENT) {
+	if (p_row->packet_info.dst_addr_mode ==
+		ZB_APS_ADDR_MODE_64_ENDP_PRESENT) {
+
 		remote_node_short = zb_address_short_by_ieee(
-					p_row->remote_node.addr_long);
+					p_row->packet_info.dst_addr.addr_long);
 	} else {
-		remote_node_short = p_row->remote_node.addr_short;
+		remote_node_short = p_row->packet_info.dst_addr.addr_short;
 	}
 
-	if (p_hdr->cluster_id != p_row->cluster_id) {
+	if (p_hdr->cluster_id != p_row->packet_info.cluster_id) {
 		return ZB_FALSE;
 	}
 
-	if (p_hdr->profile_id != p_row->profile_id) {
+	if (p_hdr->profile_id != p_row->packet_info.prof_id) {
 		return ZB_FALSE;
 	}
 
-	if (p_hdr->addr_data.common_data.src_endpoint != p_row->remote_ep) {
+	if (p_hdr->addr_data.common_data.src_endpoint !=
+		p_row->packet_info.dst_ep) {
+
 		return ZB_FALSE;
 	}
 
@@ -141,39 +142,44 @@ static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, cmd_query_t * p_row)
 	return ZB_TRUE;
 }
 
-/**@brief Construct the command frame and send it.
+/**@brief Send the ZCL command frame.
  *
- * @param bufid     ZBOSS buffer to fill.
- * @param cb_param  Row of the command parameter table.
+ * @param param  Row of the command parameter table.
  */
-static zb_void_t generic_cmd_send(zb_bufid_t bufid, zb_uint16_t cb_param)
+static zb_void_t zcl_cmd_send(zb_uint8_t param)
 {
-	zb_ret_t      zb_err_code;
-	cmd_query_t * p_cmd_query = &m_cmd_data[cb_param];
+	zb_ret_t    zb_err_code;
+	cmd_query_t *p_cmd_query = &m_cmd_data[param];
 
-	/* Start filling buffer with packet data. */
 	p_cmd_query->seq_num = ZCL_CTX().seq_number;
-	zb_uint8_t* ptr = ZB_ZCL_START_PACKET_REQ(bufid)
-	ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL(
-		ptr, (p_cmd_query->def_resp))
-	ZB_ZCL_CONSTRUCT_COMMAND_HEADER_REQ(ptr, ZB_ZCL_GET_SEQ_NUM(),
-					    p_cmd_query->cmd_id);
 
-	/* Scan argument with payload and put in buffer with command to send. */
-	for (zb_uint8_t i = 0; i < p_cmd_query->payload_length; i++) {
-		ZB_ZCL_PACKET_PUT_DATA8(ptr, (p_cmd_query->payload[i]));
+	/* Send the actual frame. */
+	zb_err_code = zb_zcl_finish_and_send_packet_new(
+				p_cmd_query->packet_info.buffer,
+				p_cmd_query->packet_info.ptr,
+				&(p_cmd_query->packet_info.dst_addr),
+				p_cmd_query->packet_info.dst_addr_mode,
+				p_cmd_query->packet_info.dst_ep,
+				p_cmd_query->packet_info.ep,
+				p_cmd_query->packet_info.prof_id,
+				p_cmd_query->packet_info.cluster_id,
+				p_cmd_query->packet_info.cb,
+				0,
+				p_cmd_query->packet_info.disable_aps_ack,
+				0);
+
+	if (zb_err_code != RET_OK) {
+		print_error(p_cmd_query->shell, "Can not send ZCL frame",
+			    ZB_FALSE);
+		/* Invalidate row ctx so that we can reuse it. */
+		invalidate_row(param);
+		zb_buf_free(p_cmd_query->packet_info.buffer);
+		return;
 	}
-
-	ZB_ZCL_FINISH_PACKET(bufid, ptr)
-	ZB_ZCL_SEND_COMMAND_SHORT(bufid, p_cmd_query->remote_node,
-				  p_cmd_query->remote_addr_mode,
-				  p_cmd_query->remote_ep, zb_get_cli_endpoint(),
-				  p_cmd_query->profile_id,
-				  p_cmd_query->cluster_id, NULL);
 
 	/* If default response is requested, schedule an alarm. */
 	if (p_cmd_query->def_resp == ZB_ZCL_ENABLE_DEFAULT_RESPONSE) {
-		zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, cb_param,
+		zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, param,
 						    CMD_ROW_TIMEOUT_S *
 						     ZB_TIME_ONE_SECOND);
 
@@ -183,40 +189,12 @@ static zb_void_t generic_cmd_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 		if (zb_err_code != RET_OK) {
 			print_error(p_cmd_query->shell, "No free buffer",
 				    ZB_FALSE);
-			invalidate_row(cb_param);
+			invalidate_row(param);
 		}
 	} else {
 		print_done(p_cmd_query->shell, ZB_FALSE);
-		invalidate_row(cb_param);
+		invalidate_row(param);
 	}
-}
-
-/**@brief Construct the raw ZCL frame and send it.
- *
- * @param bufid     ZBOSS buffer to fill.
- * @param cb_param  Row of the parameter table.
- */
-static zb_void_t raw_zcl_send(zb_bufid_t bufid, zb_uint16_t cb_param)
-{
-	cmd_query_t * p_cmd_query = &m_cmd_data[cb_param];
-
-	/* Start filling buffer with packet data. */
-	zb_uint8_t * ptr = ZB_ZCL_START_PACKET(bufid);
-
-	/* Scan argument with payload and put in buffer with command to send. */
-	for (zb_uint8_t i = 0; i < p_cmd_query->payload_length; i++) {
-		ZB_ZCL_PACKET_PUT_DATA8(ptr, (p_cmd_query->payload[i]));
-	}
-
-	ZB_ZCL_FINISH_PACKET(bufid, ptr)
-	ZB_ZCL_SEND_COMMAND_SHORT(bufid, p_cmd_query->remote_node,
-				  p_cmd_query->remote_addr_mode,
-				  p_cmd_query->remote_ep, zb_get_cli_endpoint(),
-				  p_cmd_query->profile_id,
-				  p_cmd_query->cluster_id, NULL);
-
-	print_done(p_cmd_query->shell, ZB_FALSE);
-	invalidate_row(cb_param);
 }
 
 /**@brief Send generic command to the remote node.
@@ -253,9 +231,9 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	p_cmd_data = &m_cmd_data[table_row];
 
 	/*  Set default command values. */
-	p_cmd_data->def_resp         = ZB_ZCL_DISABLE_DEFAULT_RESPONSE;
-	p_cmd_data->payload_length   = 0;
-	p_cmd_data->profile_id       = ZB_AF_HA_PROFILE_ID;
+	p_cmd_data->def_resp            = ZB_ZCL_DISABLE_DEFAULT_RESPONSE;
+	p_cmd_data->payload_length      = 0;
+	p_cmd_data->packet_info.prof_id = ZB_AF_HA_PROFILE_ID;
 
 	/* Check if default response should be requested. */
 	if (strcmp(*p_arg, "-d") == 0) {
@@ -264,15 +242,16 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	/* Parse and check remote node address. */
-	p_cmd_data->remote_addr_mode = parse_address(*p_arg,
-						     &(p_cmd_data->remote_node),
-						     ADDR_ANY);
-	if (p_cmd_data->remote_addr_mode == ADDR_INVALID) {
+	p_cmd_data->packet_info.dst_addr_mode =
+		parse_address(*p_arg, &(p_cmd_data->packet_info.dst_addr),
+			      ADDR_ANY);
+
+	if (p_cmd_data->packet_info.dst_addr_mode == ADDR_INVALID) {
 		/* Handle the Binding table case (address == '0'). */
 		if (!strcmp(*p_arg, "0")) {
-			p_cmd_data->remote_addr_mode =
+			p_cmd_data->packet_info.dst_addr_mode =
 				ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-			p_cmd_data->remote_node.addr_short = 0;
+			p_cmd_data->packet_info.dst_addr.addr_short = 0;
 		} else {
 			print_error(shell, "Wrong address format", ZB_FALSE);
 			goto error;
@@ -281,13 +260,14 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	p_arg++;
 
 	/* Read endpoint and cluster id. */
-	ret_val = sscan_uint8(*(p_arg++), &(p_cmd_data->remote_ep));
+	ret_val = sscan_uint8(*(p_arg++), &(p_cmd_data->packet_info.dst_ep));
 	if (ret_val == 0) {
 		print_error(shell, "Remote ep value", ZB_FALSE);
 		goto error;
 	}
 
-	ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->cluster_id));
+	ret_val = parse_hex_u16(*(p_arg++),
+				&(p_cmd_data->packet_info.cluster_id));
 	if (ret_val == 0) {
 		print_error(shell, "Cluster id value", ZB_FALSE);
 		goto error;
@@ -295,7 +275,8 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 
 	/* Check if different from HA profile should be used. */
 	if (strcmp(*p_arg, "-p") == 0) {
-		ret_val = parse_hex_u16(*(++p_arg), &(p_cmd_data->profile_id));
+		ret_val = parse_hex_u16(*(++p_arg),
+					&(p_cmd_data->packet_info.prof_id));
 		if (ret_val == 0) {
 			print_error(shell, "Profile id value", ZB_FALSE);
 			goto error;
@@ -314,7 +295,7 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	if (strcmp(*(p_arg++), "-l") == 0) {
 		len = strlen(*p_arg);
 		if (len > (2 * CMD_PAYLOAD_SIZE)) {
-			shell_warn(shell, "Payload length is too big, trimming it to first %d bytes\n",
+			shell_warn(shell, "Payload length is too big, trimming it to first %d bytes",
 				   CMD_PAYLOAD_SIZE);
 			len = (2 * CMD_PAYLOAD_SIZE);
 		}
@@ -332,17 +313,49 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 		p_cmd_data->payload_length = len/2;
 	}
 
-	/* Get buffer and send command. */
+	/* Set shell to print logs to. */
 	p_cmd_data->shell = shell;
-	zb_err_code = zb_buf_get_out_delayed_ext(generic_cmd_send, table_row,
-						 0);
-	if (zb_err_code != RET_OK) {
-		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
+
+	/* Get buffer and prepare command. */
+	zb_bufid_t bufid = zb_buf_get_out();
+	if (!bufid) {
+		print_error(p_cmd_data->shell, "Can not get buffer.", ZB_FALSE);
 		/* Mark data structure as free. */
 		invalidate_row(table_row);
-
 		return -ENOEXEC;
 	}
+
+	/* Start filling buffer with packet data. */
+	zb_uint8_t* ptr = ZB_ZCL_START_PACKET_REQ(bufid)
+	ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL(
+		ptr, (p_cmd_data->def_resp))
+	ZB_ZCL_CONSTRUCT_COMMAND_HEADER_REQ(ptr, ZB_ZCL_GET_SEQ_NUM(),
+					    p_cmd_data->cmd_id);
+
+	/* Scan argument with payload and put in buffer with command to send. */
+	for (zb_uint8_t i = 0; i < p_cmd_data->payload_length; i++) {
+		ZB_ZCL_PACKET_PUT_DATA8(ptr, (p_cmd_data->payload[i]));
+	}
+
+	/* Schedule frame to send. */
+	p_cmd_data->packet_info.buffer = bufid;
+	p_cmd_data->packet_info.ptr = ptr;
+	/* DstAddr, Dst Addr Mode and Dst endpoint are already set. */
+	p_cmd_data->packet_info.ep = zb_get_cli_endpoint();
+	/* Profile ID and Cluster ID are already set. */
+	p_cmd_data->packet_info.cb = NULL;
+	p_cmd_data->packet_info.disable_aps_ack = ZB_FALSE;
+
+	zb_err_code = zigbee_schedule_callback(zcl_cmd_send, table_row);
+
+	if (zb_err_code != RET_OK) {
+		print_error(p_cmd_data->shell, "Can not schedule ZCL frame",
+			    ZB_FALSE);
+		zb_buf_free(p_cmd_data->packet_info.buffer);
+		invalidate_row(table_row);
+		return -ENOEXEC;
+	}
+
 	return 0;
 
 	error:
@@ -367,12 +380,12 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
  */
 int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 {
-	zb_ret_t        zb_err_code;
-	zb_int8_t       table_row;
-	cmd_query_t   * p_cmd_data      = NULL;
-	char         ** p_arg           = &argv[1];
-	int             ret_val;
-	size_t          len;
+	zb_ret_t    zb_err_code;
+	zb_int8_t   table_row;
+	cmd_query_t *p_cmd_data      = NULL;
+	char        **p_arg           = &argv[1];
+	int         ret_val;
+	size_t      len;
 
 	/* Debug mode quick return. */
 	if (!zb_cli_debug_get()) {
@@ -392,15 +405,17 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	p_cmd_data->payload_length = 0;
 
 	/* Parse and check remote node address. */
-	p_cmd_data->remote_addr_mode = parse_address(*p_arg,
-						     &(p_cmd_data->remote_node),
-						     ADDR_ANY);
-	if (p_cmd_data->remote_addr_mode == ADDR_INVALID) {
+	p_cmd_data->packet_info.dst_addr_mode =
+			parse_address(*p_arg,
+				      &(p_cmd_data->packet_info.dst_addr),
+				      ADDR_ANY);
+
+	if (p_cmd_data->packet_info.dst_addr_mode == ADDR_INVALID) {
 		/* Handle the Binding table case (address == '0'). */
 		if (!strcmp(*p_arg, "0")) {
-			p_cmd_data->remote_addr_mode =
+			p_cmd_data->packet_info.dst_addr_mode =
 				ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-			p_cmd_data->remote_node.addr_short = 0;
+			p_cmd_data->packet_info.dst_addr.addr_short = 0;
 		} else {
 			print_error(shell, "Wrong EUI64 address format",
 				    ZB_FALSE);
@@ -410,19 +425,20 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	p_arg++;
 
 	/* Read endpoint and cluster id. */
-	ret_val = sscan_uint8(*(p_arg++), &(p_cmd_data->remote_ep));
+	ret_val = sscan_uint8(*(p_arg++), &(p_cmd_data->packet_info.dst_ep));
 	if (ret_val == 0) {
 		print_error(shell, "Remote ep value", ZB_FALSE);
 		goto error;
 	}
 
-	ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->cluster_id));
+	ret_val = parse_hex_u16(*(p_arg++),
+				&(p_cmd_data->packet_info.cluster_id));
 	if (ret_val == 0) {
 		print_error(shell, "Cluster id value", ZB_FALSE);
 		goto error;
 	}
 
-	ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->profile_id));
+	ret_val = parse_hex_u16(*(p_arg++), &(p_cmd_data->packet_info.prof_id));
 	if (ret_val == 0) {
 		print_error(shell, "Profile id value", ZB_FALSE);
 		goto error;
@@ -431,7 +447,7 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	/* Reuse the payload field from the context. */
 	len = strlen(*p_arg);
 	if (len > (2 * CMD_PAYLOAD_SIZE)) {
-		shell_warn(shell, "Raw data length is too big, trimming it to first %d bytes\n",
+		shell_warn(shell, "Raw data length is too big, trimming it to first %d bytes",
 			   CMD_PAYLOAD_SIZE);
 		len = (2 * CMD_PAYLOAD_SIZE);
 	}
@@ -449,15 +465,48 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	}
 	p_cmd_data->payload_length = len/2;
 
-	/* Get buffer and send command. */
-	p_cmd_data->shell = shell;
-	zb_err_code = zb_buf_get_out_delayed_ext(raw_zcl_send, table_row, 0);
-	if (zb_err_code != RET_OK) {
-		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
-		invalidate_row(table_row);
+	/* Disable default response for zcl raw command. */
+	p_cmd_data->def_resp = ZB_ZCL_DISABLE_DEFAULT_RESPONSE;
 
+	/* Set shell to print logs to. */
+	p_cmd_data->shell = shell;
+
+	/* Get buffer and prepare command. */
+	zb_bufid_t bufid = zb_buf_get_out();
+	if (!bufid) {
+		print_error(p_cmd_data->shell, "Can not get buffer.", ZB_FALSE);
+		/* Mark data structure as free. */
+		invalidate_row(table_row);
 		return -ENOEXEC;
 	}
+
+	/* Start filling buffer with packet data. */
+	zb_uint8_t *ptr = ZB_ZCL_START_PACKET(bufid);
+
+	/* Scan argument with payload and put in buffer with command to send. */
+	for (zb_uint8_t i = 0; i < p_cmd_data->payload_length; i++) {
+		ZB_ZCL_PACKET_PUT_DATA8(ptr, (p_cmd_data->payload[i]));
+	}
+
+	/* Schedle frame to send. */
+	p_cmd_data->packet_info.buffer = bufid;
+	p_cmd_data->packet_info.ptr = ptr;
+	/* DstAddr, Dst Addr Mode and Dst endpoint are already set. */
+	p_cmd_data->packet_info.ep = zb_get_cli_endpoint();
+	/* Profile ID and Cluster ID are already set. */
+	p_cmd_data->packet_info.cb = NULL;
+	p_cmd_data->packet_info.disable_aps_ack = ZB_FALSE;
+
+	zb_err_code = zigbee_schedule_callback(zcl_cmd_send, table_row);
+
+	if (zb_err_code != RET_OK) {
+		print_error(p_cmd_data->shell, "Can not schedule ZCL frame",
+			    ZB_FALSE);
+		zb_buf_free(p_cmd_data->packet_info.buffer);
+		invalidate_row(table_row);
+		return -ENOEXEC;
+	}
+
 	return 0;
 
 	error:
