@@ -58,6 +58,11 @@ zb_void_t zb_set_default_cli_endpoint(zb_void_t);
  */
 zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid);
 
+/**@brief Sets CLI agent as endpoint handler if a endpoint handler hasn't been
+ *        yet set for endpoint used by the CLI.
+ */
+zb_void_t zb_set_default_cli_endpoint_handler(void);
+
 /**@brief Function for setting the state of the debug mode of the CLI.
  *
  * @param debug    Turns the debug mode on (ZB_TRUE) or off (ZB_FALSE).

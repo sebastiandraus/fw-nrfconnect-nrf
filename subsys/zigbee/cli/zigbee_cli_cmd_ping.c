@@ -598,7 +598,7 @@ static void ping_req_indicate(zb_bufid_t zcl_cmd_bufid)
  *
  * @param bufid    Reference to a ZBOSS buffer
  */
-static zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
+zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid)
 {
 	zb_zcl_addr_t       remote_node_addr;
 	zb_zcl_parsed_hdr_t *p_cmd_info = ZB_BUF_GET_PARAM(bufid,
@@ -836,11 +836,3 @@ int cmd_zb_ping(const struct shell *shell, size_t argc, char **argv)
 	ping_request_send(p_row);
 	return 0;
 }
-
-
-/**@brief Endpoint handlers
- */
-#ifndef DEVELOPMENT_TODO
-#error "Endpoint handler register problem!"
-NRF_ZIGBEE_EP_HANDLER_REGISTER(ping, cli_agent_ep_handler_ping);
-#endif

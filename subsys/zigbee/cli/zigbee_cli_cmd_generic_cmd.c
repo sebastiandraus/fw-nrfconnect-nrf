@@ -518,7 +518,7 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
  *
  * @param bufid    Reference to a ZBOSS buffer
  */
-static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
+zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
 {
 	zb_zcl_parsed_hdr_t *p_cmd_info = ZB_BUF_GET_PARAM(
 						bufid, zb_zcl_parsed_hdr_t);
@@ -572,10 +572,3 @@ static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
 	zb_buf_free(bufid);
 	return ZB_TRUE;
 }
-
-/**@brief Endpoint handlers
- */
-#ifndef DEVELOPMENT_TODO
-#error "Endpoint handler problem here!"
-NRF_ZIGBEE_EP_HANDLER_REGISTER(generic_cmd, cli_agent_ep_handler_generic_cmd);
-#endif
