@@ -472,7 +472,7 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli->packet_info.cb = NULL;
 	p_tsn_cli->packet_info.disable_aps_ack = ZB_FALSE;
 
-	zb_err_code = zigbee_schedule_callback(send_reporting_frame,
+	zb_err_code = ZB_SCHEDULE_APP_CALLBACK(send_reporting_frame,
 					       (p_tsn_cli - m_tsn_ctx));
 
 	if (zb_err_code != RET_OK) {
