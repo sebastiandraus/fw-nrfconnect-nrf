@@ -16,17 +16,6 @@
 #include <zboss_api.h>
 #include <zigbee_helpers.h>
 
-/*@brief Macro which defines the Endpoint Handler section,
- *       which allows iterating over them.
- */
-#ifndef DEVELOPMENT_TODO
-// TODO: REMOVE
-#error "Endpoint to be defined here"
-#define NRF_ZIGBEE_EP_HANDLER_REGISTER(desc, p_handler)           \
-   NRF_SECTION_ITEM_REGISTER(zb_ep_handlers, zb_device_handler_t const CONCAT_2(zb_ep_, desc)) = p_handler;
-*/ //TODO: REMOVE
-#endif
-
 /**@brief Finish the command by dumping 'Done'.
  *
  * @param prepend_newline      Whether to prepend a newline.

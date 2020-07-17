@@ -102,6 +102,15 @@ static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
 			return -ENOEXEC;
 		}
 
+#ifdef ZB_ED_ROLE
+		if (!strcmp(argv[1], "zed")) {
+			m_default_role = ZB_NWK_DEVICE_TYPE_ED;
+			shell_print(shell, "End Device role set");
+		} else {
+			print_error(shell, "Role unsupported", ZB_FALSE);
+			return -ENOEXEC;
+		}
+#else
 		if (!strcmp(argv[1], "zc")) {
 			m_default_role = ZB_NWK_DEVICE_TYPE_COORDINATOR;
 			shell_print(shell, "Coordinator set");
@@ -112,6 +121,7 @@ static int cmd_zb_role(const struct shell *shell, size_t argc, char **argv)
 			print_error(shell, "Role unsupported", ZB_FALSE);
 			return -ENOEXEC;
 		}
+#endif
 	}
 
 	print_done(shell, ZB_FALSE);

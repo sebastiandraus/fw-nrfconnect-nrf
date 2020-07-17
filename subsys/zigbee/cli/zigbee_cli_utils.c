@@ -15,32 +15,36 @@
 #include <zigbee_logger_eprxzcl.h>
 #include "zigbee_cli_utils.h"
 
-#ifndef DEVELOPMENT_TODO
-#error "Endpoint handler to be done here"
-// TODO: REMOVE
-NRF_SECTION_DEF(zb_ep_handlers, zb_device_handler_t);
-#define ZB_EP_HANDLER_SECTION_ITEM_GET(i) NRF_SECTION_ITEM_GET(zb_ep_handlers, zb_device_handler_t, (i))
-#define ZB_EP_HANDLER_SECTION_ITEM_COUNT  NRF_SECTION_ITEM_COUNT(zb_ep_handlers, zb_device_handler_t)
+extern zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid);
+extern zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid);
+extern zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid);
+extern zb_uint8_t cli_agent_ep_handler_ping(zb_bufid_t bufid);
+
+zb_device_handler_t zb_ep_handlers[] = {
+	cli_agent_ep_handler_attr,
+	cli_agent_ep_handler_generic_cmd,
+	cli_agent_ep_handler_report,
+	cli_agent_ep_handler_ping
+};
 
 zb_uint8_t cli_agent_ep_handler(zb_bufid_t bufid)
 {
 	unsigned int idx;
+	u8_t ep_handler_cnt = (sizeof(zb_ep_handlers) /
+			       sizeof(zb_device_handler_t));
 
-// #if defined(DEBUG_NRF) && NRF_LOG_ENABLED
-	UNUSED_RETURN_VALUE(zigbee_logger_eprxzcl_ep_handler(bufid));
-// #endif
+#if defined(CONFIG_ZIGBEE_SHELL_DEBUG_CMD) && defined(CONFIG_LOG)
+	(void)(zigbee_logger_eprxzcl_ep_handler(bufid));
+#endif
 
-	for (idx = 0; idx < ZB_EP_HANDLER_SECTION_ITEM_COUNT; idx++) {
-		zb_device_handler_t handler = *(ZB_EP_HANDLER_SECTION_ITEM_GET(idx));
-		if (handler(bufid) == ZB_TRUE) {
+	for (idx = 0; idx < ep_handler_cnt; idx++) {
+		if ((zb_ep_handlers[idx])(bufid) == ZB_TRUE) {
 			return ZB_TRUE;
 		}
 	}
 
 	return ZB_FALSE;
 }
-//TODO: REMOVE
-#endif
 
 int zcl_attr_to_str(char *p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
 		    zb_uint8_t *p_attr)

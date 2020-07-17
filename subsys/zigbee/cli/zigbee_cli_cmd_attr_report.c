@@ -268,7 +268,7 @@ static void print_attr_update(zb_zcl_parsed_hdr_t *p_zcl_hdr, zb_bufid_t bufid)
  *
  * @returns ZB_TRUE if ZCL command was processed.
  */
-static zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid)
+zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid)
 {
 	zb_zcl_parsed_hdr_t *p_cmd_info = ZB_BUF_GET_PARAM(bufid,
 							   zb_zcl_parsed_hdr_t);
@@ -485,10 +485,3 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 
 	return 0;
 }
-
-/**@brief Endpoint handlers
- */
-#ifndef DEVELOPMENT_TODO
-#error "Endpoint handler to be done here"
-NRF_ZIGBEE_EP_HANDLER_REGISTER(report, cli_agent_ep_handler_report);
-#endif

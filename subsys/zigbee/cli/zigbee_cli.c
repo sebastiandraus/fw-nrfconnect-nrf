@@ -120,26 +120,59 @@ zb_void_t zb_set_default_cli_endpoint(zb_void_t)
 		return;
 	}
 
+	/* Verify that ZCL device ctx is present at the device as for example,
+	 * network coordinator sample doesn't have one by default.
+	 */
+	if (p_zcl_ctx->device_ctx == NULL) {
+		return;
+	}
+
 	/* Iterate over all endpoints present in ZCL ctx to find
 	 * endpoint with lowest number.
 	 */
 	for (u8_t index = 0; index < p_zcl_ctx->device_ctx->ep_count; index++) {
 		zb_uint8_t temp_ep =
 			p_zcl_ctx->device_ctx->ep_desc_list[index]->ep_id;
-		/* Validate endpoint numeber:
+		/* Validate endpoint number:
 		 * - not a ZDO endpoint (temp_ep != 0)
 		 * - not a reserved value (temp_ep < 241)
 		 */
 		if ((temp_ep < ZB_MIN_ENDPOINT_NUMBER) ||
-		    (temp_ep <= ZB_MAX_ENDPOINT_NUMBER)) {
+		    (temp_ep > ZB_MAX_ENDPOINT_NUMBER)) {
 			continue;
 		}
 		if (temp_ep < ep_to_set) {
 			ep_to_set = temp_ep;
 		}
 	}
-	if (ep_to_set != 0xFF) {
+	if (ep_to_set != ZB_MAX_ENDPOINT_NUMBER) {
 		zb_set_cli_endpoint(ep_to_set);
+	}
+}
+
+/**@brief Sets CLI agent as endpoint handler if a endpoint handler hasn't been
+ *        yet set for endpoint used by the CLI.
+ */
+zb_void_t zb_set_default_cli_endpoint_handler(void)
+{
+	zb_uint8_t cli_ep = zb_get_cli_endpoint();
+	zb_af_endpoint_desc_t *cli_ep_desc;
+
+	/* Verify that ZCL device ctx is present at the device as for example,
+	 * network coordinator sample doesn't have one by default.
+	 */
+	if (zb_zcl_get_ctx()->device_ctx == NULL) {
+		return;
+	}
+
+	cli_ep_desc = zb_af_get_endpoint_desc(cli_ep);
+
+	if ((cli_ep == ZB_MAX_ENDPOINT_NUMBER) || (cli_ep_desc == NULL)) {
+		return;
+	}
+
+	if (!cli_ep_desc->device_handler) {
+		ZB_AF_SET_ENDPOINT_HANDLER(cli_ep, cli_agent_ep_handler);
 	}
 }
 

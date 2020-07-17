@@ -65,7 +65,7 @@ static zb_int8_t get_attr_table_row_by_sn(zb_uint8_t sernum)
 {
 	int i;
 	for (i = 0; i < ATTRIBUTE_TABLE_SIZE; i++) {
-		if (atomic_get(&m_attr_table[i].taken) == ZB_TRUE) {
+		if (atomic_get(&(m_attr_table[i].taken)) == ZB_TRUE) {
 			if (m_attr_table[i].seq_num == sernum) {
 				return i;
 			}
@@ -214,7 +214,7 @@ static void print_write_attr_response(zb_bufid_t bufid, attr_query_t *p_row)
  *
  * @param bufid    ZBOSS buffer id.
  */
-static zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid)
+zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid)
 {
 	zb_zcl_parsed_hdr_t *p_cmd_info;
 	zb_int8_t row;
@@ -264,7 +264,11 @@ static zb_void_t read_write_attr_send(zb_uint8_t param)
 	zb_uint8_t row = param;
 	attr_query_t *p_row = &(m_attr_table[row]);
 
-	p_row->seq_num = ZCL_CTX().seq_number;
+	/* ZCL sequence number is decreased because of previous
+	 * `ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A` called, in which when
+	 * ZCL seq nbr is taken, it is also increased.
+	 */
+	p_row->seq_num = (ZCL_CTX().seq_number - 1);
 
 	zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, row,
 					    ATTRIBUTE_ROW_TIMEOUT_S *
@@ -371,7 +375,7 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	atomic_set(&p_row->taken, ZB_TRUE);
 
 	/* Put the shell instance to be used later. */
-	p_row->shell = (const struct shell*)shell;
+	p_row->shell = shell;
 
 	zb_bufid_t bufid = zb_buf_get_out();
 
@@ -519,10 +523,3 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	}
 	return 0;
 }
-
-/**@brief Endpoint handlers
- */
-#ifndef DEVELOPMENT_TODO
-#error "Endpoint handler to be done here."
-NRF_ZIGBEE_EP_HANDLER_REGISTER(attr, cli_agent_ep_handler_attr);
-#endif
