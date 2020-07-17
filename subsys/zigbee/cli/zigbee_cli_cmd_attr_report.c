@@ -13,6 +13,7 @@
 #include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
+#include "zigbee_cli_cmd_zcl.h"
 
 /* Defines how many report attribute requests can be run concurrently. */
 #define ZIGBEE_CLI_CONFIGURE_REPORT_TSN                  3
@@ -46,23 +47,19 @@ LOG_MODULE_REGISTER(report, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 typedef struct {
 	const struct shell *shell;
 	u8_t               tsn;
-	bool               taken;
+	atomic_t           taken;
 	bool               is_broadcast;
+	zcl_packet_info_t  packet_info;
 } tsn_ctx_t;
 
-/* This structure representing all fields required to construct configure
+/* This structure representing fields required to construct configure
  * reporting requests.
  */
 typedef struct {
-	zb_uint16_t profile_id;
-	zb_uint16_t cluster_id;
 	zb_uint16_t attr_id;
 	zb_uint8_t  attr_type;
 	zb_uint16_t interval_min;
 	zb_uint16_t interval_max;
-	zb_addr_u   remote_node;
-	addr_type_t remote_addr_mode;
-	zb_uint8_t  remote_ep;
 } configure_reporting_req_t;
 
 static tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_CONFIGURE_REPORT_TSN];
@@ -75,10 +72,11 @@ static tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_CONFIGURE_REPORT_TSN];
  *
  * @return a pointer to context or NULL if context for given TSN wasn't found.
  */
-static tsn_ctx_t * get_ctx_by_tsn(u8_t tsn)
+static tsn_ctx_t *get_ctx_by_tsn(u8_t tsn)
 {
 	for (u8_t i = 0; i < ARRAY_SIZE(m_tsn_ctx); i++) {
-		if ((m_tsn_ctx[i].taken == true) && (m_tsn_ctx[i].tsn == tsn)) {
+		if ((atomic_get(&m_tsn_ctx[i].taken) == true) &&
+		    (m_tsn_ctx[i].tsn == tsn)) {
 			return &m_tsn_ctx[i];
 		}
 	}
@@ -90,10 +88,10 @@ static tsn_ctx_t * get_ctx_by_tsn(u8_t tsn)
  *
  * @return a pointer to context structure or NULL if all contexts are taken.
  */
-static tsn_ctx_t * get_free_tsn_ctx(void)
+static tsn_ctx_t *get_free_tsn_ctx(void)
 {
 	for (u8_t i = 0; i < ARRAY_SIZE(m_tsn_ctx); i++) {
-		if (!m_tsn_ctx[i].taken) {
+		if (!atomic_get(&m_tsn_ctx[i].taken)) {
 			return &m_tsn_ctx[i];
 		}
 	}
@@ -106,11 +104,12 @@ static tsn_ctx_t * get_free_tsn_ctx(void)
  *
  * @param[in] p_tsn_ctx a pointer to transaction context.
  */
-static void invalidate_ctx(tsn_ctx_t * p_tsn_ctx)
+static void invalidate_ctx(tsn_ctx_t *p_tsn_ctx)
 {
-	p_tsn_ctx->taken = false;
+	atomic_set(&p_tsn_ctx->taken, false);
 	p_tsn_ctx->tsn   = 0xFF;
 	p_tsn_ctx->shell = NULL;
+	memset(&(p_tsn_ctx->packet_info), 0x00, sizeof(zcl_packet_info_t));
 }
 
 /**@brief Handles timeout error and invalidates configure reporting transaction.
@@ -119,7 +118,7 @@ static void invalidate_ctx(tsn_ctx_t * p_tsn_ctx)
  */
 static void cmd_zb_subscribe_unsubscribe_timeout(u8_t tsn)
 {
-	tsn_ctx_t * p_tsn_ctx = get_ctx_by_tsn(tsn);
+	tsn_ctx_t *p_tsn_ctx = get_ctx_by_tsn(tsn);
 
 	if (!p_tsn_ctx) {
 		return;
@@ -218,7 +217,7 @@ free_tsn_ctx:
  * @param p_zcl_hdr[in]     Pointer to parsed ZCL header
  * @param bufid[in]         ZBOSS buffer id
  */
-static void print_attr_update(zb_zcl_parsed_hdr_t * p_zcl_hdr, zb_bufid_t bufid)
+static void print_attr_update(zb_zcl_parsed_hdr_t *p_zcl_hdr, zb_bufid_t bufid)
 {
 	zb_zcl_report_attr_req_t *p_attr_resp   = NULL;
 	zb_zcl_addr_t remote_node_data =
@@ -291,6 +290,56 @@ static zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid)
 	return ZB_FALSE;
 }
 
+/**@brief Function to send Configure Reporting command.
+ *
+ * @param[in] param  Number of row of `m_tsn_ctx` table from which informations
+ *                   about the ZCL packet are taken.
+ */
+static zb_void_t send_reporting_frame(zb_uint8_t param)
+{
+	zb_ret_t zb_err_code;
+	zb_uint8_t row = param;
+	tsn_ctx_t *p_row = &(m_tsn_ctx[row]);
+
+	p_row->tsn = ZCL_CTX().seq_number;
+
+	/* Send the actual frame. */
+	zb_err_code = zb_zcl_finish_and_send_packet_new(
+				p_row->packet_info.buffer,
+				p_row->packet_info.ptr,
+				&(p_row->packet_info.dst_addr),
+				p_row->packet_info.dst_addr_mode,
+				p_row->packet_info.dst_ep,
+				p_row->packet_info.ep,
+				p_row->packet_info.prof_id,
+				p_row->packet_info.cluster_id,
+				p_row->packet_info.cb,
+				0,
+				p_row->packet_info.disable_aps_ack,
+				0);
+
+	if (zb_err_code != RET_OK) {
+		print_error(p_row->shell, "Can not send ZCL frame",
+			    ZB_FALSE);
+		/* Invalidate row ctx so that we can reuse it. */
+		invalidate_ctx(p_row);
+		zb_buf_free(p_row->packet_info.buffer);
+		return;
+	}
+
+	/* Start timeout timer. */
+	zb_err_code = ZB_SCHEDULE_APP_ALARM(
+			cmd_zb_subscribe_unsubscribe_timeout, p_row->tsn,
+			ZIGBEE_CLI_CONFIGURE_REPORT_RESP_TIMEOUT *
+			 ZB_TIME_ONE_SECOND);
+
+	if (zb_err_code != RET_OK) {
+		print_error(p_row->shell, "Unable to schedule timeout timer",
+			    ZB_FALSE);
+		invalidate_ctx(p_row);
+	}
+}
+
 /**@brief Subscribe to the attribute changes on the remote node.
  *
  * @code
@@ -311,9 +360,9 @@ static zb_uint8_t cli_agent_ep_handler_report(zb_bufid_t bufid)
 int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 {
 	configure_reporting_req_t   req;
-	tsn_ctx_t                 * p_tsn_cli;
+	tsn_ctx_t                  *p_tsn_cli;
 	zb_bufid_t                  bufid;
-	zb_uint8_t                * p_cmd_ptr;
+	zb_uint8_t                 *p_cmd_ptr;
 	zb_ret_t                    zb_err_code;
 	zb_bool_t                   subscribe;
 
@@ -325,25 +374,33 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	req.remote_addr_mode = parse_address(argv[1], &req.remote_node,
-					     ADDR_ANY);
+	p_tsn_cli = get_free_tsn_ctx();
+	if (!p_tsn_cli) {
+		print_error(shell, "Too many configure reporting requests",
+			    ZB_FALSE);
+		return -ENOEXEC;
+	}
 
-	if (req.remote_addr_mode == ADDR_INVALID) {
+	p_tsn_cli->packet_info.dst_addr_mode =
+		parse_address(argv[1], &p_tsn_cli->packet_info.dst_addr,
+			      ADDR_ANY);
+
+	if (p_tsn_cli->packet_info.dst_addr_mode == ADDR_INVALID) {
 		print_error(shell, "Invalid remote address", ZB_FALSE);
 		return -EINVAL;
 	}
 
-	if (!sscan_uint8(argv[2], &(req.remote_ep))) {
+	if (!sscan_uint8(argv[2], &(p_tsn_cli->packet_info.dst_ep))) {
 		print_error(shell, "Incorrect remote endpoint", ZB_FALSE);
 		return -EINVAL;
 	}
 
-	if (!parse_hex_u16(argv[3], &(req.cluster_id))) {
+	if (!parse_hex_u16(argv[3], &(p_tsn_cli->packet_info.cluster_id))) {
 		print_error(shell, "Incorrect cluster ID", ZB_FALSE);
 		return -EINVAL;
 	}
 
-	if (!parse_hex_u16(argv[4], &(req.profile_id))) {
+	if (!parse_hex_u16(argv[4], &(p_tsn_cli->packet_info.prof_id))) {
 		print_error(shell, "Incorrect profile ID", ZB_FALSE);
 		return -EINVAL;
 	}
@@ -390,21 +447,13 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 		print_error(shell,
 			    "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
-		return -ENOEXEC;
-	}
-
-	p_tsn_cli = get_free_tsn_ctx();
-	if (!p_tsn_cli) {
-		print_error(shell, "Too many configure reporting requests",
-			    ZB_FALSE);
-		zb_buf_free(bufid);
+		invalidate_ctx(p_tsn_cli);
 		return -ENOEXEC;
 	}
 
 	/* Configure new tsn context. */
-	p_tsn_cli->taken = true;
+	atomic_set(&(p_tsn_cli->taken), true);
 	p_tsn_cli->shell = shell;
-	p_tsn_cli->tsn   = ZCL_CTX().seq_number;
 
 	/* Construct and send request. */
 	ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_SRV_REQ(
@@ -413,36 +462,27 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 		p_cmd_ptr, req.attr_id, req.attr_type, req.interval_min,
 		req.interval_max,
 		ZIGBEE_CLI_CONFIGURE_REPORT_DEFAULT_VALUE_CHANGE);
-	ZB_ZCL_GENERAL_SEND_CONFIGURE_REPORTING_REQ(
-		bufid, p_cmd_ptr, req.remote_node, req.remote_addr_mode,
-		req.remote_ep, zb_get_cli_endpoint(), req.profile_id,
-		req.cluster_id, NULL);
 
-////////////////////////////////////////////////////////////////////////////////
+	/* Fill the structure for sending ZCL frame. */
+	p_tsn_cli->packet_info.buffer = bufid;
+	p_tsn_cli->packet_info.ptr = p_cmd_ptr;
+	/* DstAddr, DstAddr Mode and dst endpoint are already set. */
+	p_tsn_cli->packet_info.ep = zb_get_cli_endpoint();
+	/* Profile ID and Cluster ID are already set. */
+	p_tsn_cli->packet_info.cb = NULL;
+	p_tsn_cli->packet_info.disable_aps_ack = ZB_FALSE;
 
-bufid
-p_cmd_ptr
-req.remote_node
-req.remote_addr_mode
-req.remote_ep
-zb_get_cli_endpoint()
-req.profile_id
-req.cluster_id
-NULL
+	zb_err_code = zigbee_schedule_callback(send_reporting_frame,
+					       (p_tsn_cli - m_tsn_ctx));
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-	/* Start timeout timer. */
-	zb_err_code = ZB_SCHEDULE_APP_ALARM(
-			cmd_zb_subscribe_unsubscribe_timeout, p_tsn_cli->tsn,
-			ZIGBEE_CLI_CONFIGURE_REPORT_RESP_TIMEOUT *
-			 ZB_TIME_ONE_SECOND);
 	if (zb_err_code != RET_OK) {
-		print_error(shell, "Unable to schedule timeout timer",
-			    ZB_FALSE);
+		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
+		/* Invalidate ctx so that we can reuse it. */
 		invalidate_ctx(p_tsn_cli);
+		zb_buf_free(bufid);
+		return -ENOEXEC;
 	}
+
 	return 0;
 }
 
