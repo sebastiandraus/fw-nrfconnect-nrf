@@ -11,6 +11,7 @@
 #include <zb_nrf_platform.h>
 #include "zigbee_cli.h"
 #include "zigbee_cli_utils.h"
+#include "zigbee_cli_cmd_zcl.h"
 
 #define ATTRIBUTE_TABLE_SIZE     20
 #define ATTRIBUTE_ROW_TIMEOUT_S  10
@@ -31,9 +32,6 @@ typedef struct attr_query_s {
 	atomic_t                   taken;
 	zb_uint8_t                 seq_num;
 	attr_req_type_t            req_type;
-	zb_addr_u                  remote_node;
-	zb_uint8_t                 remote_addr_mode;
-	zb_uint8_t                 remote_ep;
 	zb_uint16_t                profile_id;
 	zb_uint16_t                cluster_id;
 	zb_uint16_t                attr_id;
@@ -41,6 +39,7 @@ typedef struct attr_query_s {
 	zb_uint8_t                 attr_value[32];
 	zb_zcl_frame_direction_t   direction;
 	const struct shell         *shell;
+	zcl_packet_info_t          packet_info;
 } attr_query_t;
 
 static attr_query_t m_attr_table[ATTRIBUTE_TABLE_SIZE];
@@ -82,6 +81,7 @@ static zb_int8_t get_attr_table_row_by_sn(zb_uint8_t sernum)
 static zb_void_t invalidate_row(zb_uint8_t row)
 {
 	if (row < ATTRIBUTE_TABLE_SIZE) {
+		atomic_set(&m_attr_table[row].taken, ZB_FALSE);
 		ZB_MEMSET(&(m_attr_table[row]), 0x00, sizeof(attr_query_t));
 	}
 }
@@ -113,11 +113,12 @@ static zb_void_t frame_acked_cb(zb_bufid_t bufid)
 static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, attr_query_t * p_row)
 {
 	zb_uint16_t remote_node_short = 0;
-	if (p_row->remote_addr_mode == ZB_APS_ADDR_MODE_64_ENDP_PRESENT) {
+	if (p_row->packet_info.dst_addr_mode ==
+	    ZB_APS_ADDR_MODE_64_ENDP_PRESENT) {
 		remote_node_short = zb_address_short_by_ieee(
-					p_row->remote_node.addr_long);
+					p_row->packet_info.dst_addr.addr_long);
 	} else {
-		remote_node_short = p_row->remote_node.addr_short;
+		remote_node_short = p_row->packet_info.dst_addr.addr_short;
 	}
 
 	if (p_hdr->cluster_id != p_row->cluster_id) {
@@ -128,7 +129,8 @@ static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, attr_query_t * p_row)
 		return ZB_FALSE;
 	}
 
-	if (p_hdr->addr_data.common_data.src_endpoint != p_row->remote_ep) {
+	if (p_hdr->addr_data.common_data.src_endpoint !=
+	    p_row->packet_info.dst_ep) {
 		return ZB_FALSE;
 	}
 
@@ -252,17 +254,16 @@ static zb_uint8_t cli_agent_ep_handler_attr(zb_bufid_t bufid)
 	return ZB_TRUE;
 }
 
-/**@brief Actually construct the Read Attribute frame and send it.
+/**@brief Actually construct the Read or Write Attribute frame and send it.
  *
- * @param bufid     ZBOSS buffer id.
- * @param cb_param  Row of the read attribute table to refer to.
+ * @param param  Row of the read attribute table to refer to.
  */
-static zb_void_t readattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
+static zb_void_t read_write_attr_send(zb_uint8_t param)
 {
 	zb_ret_t zb_err_code;
-	zb_uint8_t row = cb_param;
-	zb_uint8_t * p_cmd_buf;
-	attr_query_t * p_row = &(m_attr_table[row]);
+	zb_uint8_t row = param;
+	attr_query_t *p_row = &(m_attr_table[row]);
+
 	p_row->seq_num = ZCL_CTX().seq_number;
 
 	zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, row,
@@ -273,57 +274,33 @@ static zb_void_t readattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 			    ZB_FALSE);
 		/* Invalidate row so that we can reuse it. */
 		invalidate_row(row);
-		zb_buf_free(bufid);
+		zb_buf_free(p_row->packet_info.buffer);
 		return;
 	}
 
-	ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction,
-					    ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
-	ZB_ZCL_GENERAL_ADD_ID_READ_ATTR_REQ(p_cmd_buf, p_row->attr_id);
-	ZB_ZCL_GENERAL_SEND_READ_ATTR_REQ(bufid, p_cmd_buf, p_row->remote_node,
-					  p_row->remote_addr_mode,
-					  p_row->remote_ep,
-					  zb_get_cli_endpoint(),
-					  p_row->profile_id, p_row->cluster_id,
-					  frame_acked_cb);
-}
+	/* Send the actual frame. */
+	zb_err_code = zb_zcl_finish_and_send_packet_new(
+				p_row->packet_info.buffer,
+				p_row->packet_info.ptr,
+				&(p_row->packet_info.dst_addr),
+				p_row->packet_info.dst_addr_mode,
+				p_row->packet_info.dst_ep,
+				p_row->packet_info.ep,
+				p_row->packet_info.prof_id,
+				p_row->packet_info.cluster_id,
+				p_row->packet_info.cb,
+				0,
+				p_row->packet_info.disable_aps_ack,
+				0);
 
-/**@brief Actually construct the Write Attribute frame and send it.
- *
- * @param bufid     ZBOSS buffer id.
- * @param cb_param  Row of the read attribute table to refer to.
- */
-static zb_void_t writeattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
-{
-	zb_ret_t zb_err_code;
-	zb_uint8_t row = cb_param;
-	zb_uint8_t * p_cmd_buf;
-	attr_query_t * p_row = &(m_attr_table[row]);
-	p_row->seq_num = ZCL_CTX().seq_number;
-
-	zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, row,
-					    ATTRIBUTE_ROW_TIMEOUT_S *
-					     ZB_TIME_ONE_SECOND);
 	if (zb_err_code != RET_OK) {
-		print_error(p_row->shell, "No frame left - wait a bit",
+		print_error(p_row->shell, "Can not send ZCL frame",
 			    ZB_FALSE);
 		/* Invalidate row so that we can reuse it. */
 		invalidate_row(row);
-		zb_buf_free(bufid);
+		zb_buf_free(p_row->packet_info.buffer);
 		return;
 	}
-
-	ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction,
-					     ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
-	ZB_ZCL_GENERAL_ADD_VALUE_WRITE_ATTR_REQ(p_cmd_buf, p_row->attr_id,
-						p_row->attr_type,
-						p_row->attr_value);
-	ZB_ZCL_GENERAL_SEND_WRITE_ATTR_REQ(bufid, p_cmd_buf, p_row->remote_node,
-					   p_row->remote_addr_mode,
-					   p_row->remote_ep,
-					   zb_get_cli_endpoint(),
-					   p_row->profile_id, p_row->cluster_id,
-					   frame_acked_cb);
 }
 
 /**@brief Retrieve the attribute value of the remote node.
@@ -340,6 +317,7 @@ static zb_void_t writeattr_send(zb_bufid_t bufid, zb_uint16_t cb_param)
 int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 {
 	zb_ret_t zb_err_code;
+	zb_uint8_t *p_cmd_buf;
 	zb_int8_t row = get_free_row_attr_table();
 
 	bool is_direction_present = ((argc == 7) && !strcmp(argv[4], "-c"));
@@ -354,17 +332,18 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 		return -ENOEXEC;
 	}
 
-	attr_query_t * p_row = &(m_attr_table[row]);
+	attr_query_t *p_row = &(m_attr_table[row]);
 
-	p_row->remote_addr_mode = parse_address(*(++argv),
-						&(p_row->remote_node),
+	p_row->packet_info.dst_addr_mode = parse_address(
+						*(++argv),
+						&(p_row->packet_info.dst_addr),
 						ADDR_ANY);
-	if (p_row->remote_addr_mode == ADDR_INVALID) {
+	if (p_row->packet_info.dst_addr_mode == ADDR_INVALID) {
 		print_error(shell, "Invalid address", ZB_FALSE);
 		return -EINVAL;
 	}
 
-	(void)(sscan_uint8(*(++argv), &(p_row->remote_ep)));
+	(void)(sscan_uint8(*(++argv), &(p_row->packet_info.dst_ep)));
 
 	if (!parse_hex_u16(*(++argv), &(p_row->cluster_id))) {
 		print_error(shell, "Invalid cluster id", ZB_FALSE);
@@ -394,11 +373,31 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	/* Put the shell instance to be used later. */
 	p_row->shell = (const struct shell*)shell;
 
-	zb_err_code = zb_buf_get_out_delayed_ext(readattr_send, row, 0);
+	zb_bufid_t bufid = zb_buf_get_out();
+
+	ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction,
+					    ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+	ZB_ZCL_GENERAL_ADD_ID_READ_ATTR_REQ(p_cmd_buf, p_row->attr_id);
+
+	/* Fill the structure for sending ZCL frame. */
+	p_row->packet_info.buffer = bufid;
+	p_row->packet_info.ptr = p_cmd_buf;
+	/* DstAddr already set. */
+	/* DstAddr Mode already set. */
+	/* Remote endpoint already set. */
+	p_row->packet_info.ep = zb_get_cli_endpoint();
+	p_row->packet_info.prof_id = p_row->profile_id;
+	p_row->packet_info.cluster_id = p_row->cluster_id;
+	p_row->packet_info.cb = frame_acked_cb;
+	p_row->packet_info.disable_aps_ack = ZB_FALSE;
+
+	zb_err_code = zigbee_schedule_callback(read_write_attr_send, row);
+
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
 		/* Invalidate row so that we can reuse it. */
 		invalidate_row(row);
+		zb_buf_free(bufid);
 		return -ENOEXEC;
 	}
 	return 0;
@@ -422,6 +421,7 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 {
 	zb_ret_t zb_err_code;
+	zb_uint8_t *p_cmd_buf;
 	zb_int8_t row = get_free_row_attr_table();
 
 	bool is_direction_present = ((argc == 9) && !strcmp(argv[4], "-c"));
@@ -438,15 +438,16 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 
 	attr_query_t * p_row = &(m_attr_table[row]);
 
-	p_row->remote_addr_mode = parse_address(*(++argv),
-						&(p_row->remote_node),
+	p_row->packet_info.dst_addr_mode = parse_address(
+						*(++argv),
+						&(p_row->packet_info.dst_addr),
 						ADDR_ANY);
-	if (p_row->remote_addr_mode ==  ADDR_INVALID) {
+	if (p_row->packet_info.dst_addr_mode ==  ADDR_INVALID) {
 		print_error(shell, "Invalid address", ZB_FALSE);
 		return -EINVAL;
 	}
 
-	(void)(sscan_uint8(*(++argv), &(p_row->remote_ep)));
+	(void)(sscan_uint8(*(++argv), &(p_row->packet_info.dst_ep)));
 
 	if (!parse_hex_u16(*(++argv), &(p_row->cluster_id))) {
 		print_error(shell, "Invalid cluster id", ZB_FALSE);
@@ -491,14 +492,35 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	/* Put the shell instance to be used later. */
 	p_row->shell = (const struct shell*)shell;
 
-	zb_err_code = zb_buf_get_out_delayed_ext(writeattr_send, row, 0);
+	zb_bufid_t bufid = zb_buf_get_out();
+
+	ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction,
+					     ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
+	ZB_ZCL_GENERAL_ADD_VALUE_WRITE_ATTR_REQ(p_cmd_buf, p_row->attr_id,
+						p_row->attr_type,
+						p_row->attr_value);
+
+	/* Fill the structure for sending ZCL frame.  */
+	p_row->packet_info.buffer = bufid;
+	p_row->packet_info.ptr = p_cmd_buf;
+	/* DstAddr already set. */
+	/* DstAddr Mode already set. */
+	/* Destination endpoint already set. */
+	p_row->packet_info.ep = zb_get_cli_endpoint();
+	p_row->packet_info.prof_id = p_row->profile_id;
+	p_row->packet_info.cluster_id = p_row->cluster_id;
+	p_row->packet_info.cb = frame_acked_cb;
+	p_row->packet_info.disable_aps_ack = ZB_FALSE;
+
+	zb_err_code = zigbee_schedule_callback(read_write_attr_send, row);
+
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
 		/* Invalidate row so that we can reuse it. */
 		invalidate_row(row);
+		zb_buf_free(bufid);
 		return -ENOEXEC;
 	}
-
 	return 0;
 }
 
