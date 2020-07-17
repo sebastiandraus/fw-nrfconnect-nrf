@@ -418,6 +418,21 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 		req.remote_ep, zb_get_cli_endpoint(), req.profile_id,
 		req.cluster_id, NULL);
 
+////////////////////////////////////////////////////////////////////////////////
+
+bufid
+p_cmd_ptr
+req.remote_node
+req.remote_addr_mode
+req.remote_ep
+zb_get_cli_endpoint()
+req.profile_id
+req.cluster_id
+NULL
+
+
+////////////////////////////////////////////////////////////////////////////////
+
 	/* Start timeout timer. */
 	zb_err_code = ZB_SCHEDULE_APP_ALARM(
 			cmd_zb_subscribe_unsubscribe_timeout, p_tsn_cli->tsn,

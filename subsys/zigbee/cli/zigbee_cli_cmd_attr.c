@@ -382,9 +382,7 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	/* Fill the structure for sending ZCL frame. */
 	p_row->packet_info.buffer = bufid;
 	p_row->packet_info.ptr = p_cmd_buf;
-	/* DstAddr already set. */
-	/* DstAddr Mode already set. */
-	/* Remote endpoint already set. */
+	/* DstAddr, DstAddr Mode, Destination endpoint are already set. */
 	p_row->packet_info.ep = zb_get_cli_endpoint();
 	p_row->packet_info.prof_id = p_row->profile_id;
 	p_row->packet_info.cluster_id = p_row->cluster_id;
@@ -503,9 +501,7 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	/* Fill the structure for sending ZCL frame.  */
 	p_row->packet_info.buffer = bufid;
 	p_row->packet_info.ptr = p_cmd_buf;
-	/* DstAddr already set. */
-	/* DstAddr Mode already set. */
-	/* Destination endpoint already set. */
+	/* DstAddr, DstAddr Mode, Destination endpoint are already set. */
 	p_row->packet_info.ep = zb_get_cli_endpoint();
 	p_row->packet_info.prof_id = p_row->profile_id;
 	p_row->packet_info.cluster_id = p_row->cluster_id;
