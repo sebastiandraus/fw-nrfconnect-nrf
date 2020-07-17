@@ -213,7 +213,7 @@ config ZIGBEE_SHELL_DEBUG_CMD
 	default n
 
 config ZIGBEE_SHELL_PROMPT
-	string "Prompt to be used in Zigbee shell"
+	string "Prompt to be used in Zigbee shells"
 	default "> "
 
 endif #ZIGBEE_CLI_SHELL
