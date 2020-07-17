@@ -125,7 +125,7 @@ static zdo_tsn_ctx_t m_tsn_ctx[ZIGBEE_CLI_ZDO_TSN];
  *
  * @return a pointer to context or NULL if context for given TSN wasn't found.
  */
-static zdo_tsn_ctx_t * get_ctx_by_tsn(u8_t tsn)
+static zdo_tsn_ctx_t *get_ctx_by_tsn(u8_t tsn)
 {
 	for (u8_t i = 0; i < ARRAY_SIZE(m_tsn_ctx); i++) {
 		if ((atomic_get(&m_tsn_ctx[i].taken)) &&
@@ -180,7 +180,7 @@ static void invalidate_ctx(zdo_tsn_ctx_t *p_tsn_ctx)
  * @return 1 if parsing succeeded, 0 otherwise.
  *
  */
-static int sscan_cluster_list(char ** pp_argv, u8_t num, u16_t * pp_id)
+static int sscan_cluster_list(char **pp_argv, u8_t num, u16_t *pp_id)
 {
 	u16_t len = 0;
 
@@ -235,7 +235,7 @@ static void zb_zdo_req(u8_t idx)
  */
 static void cmd_zb_match_desc_timeout(zb_uint8_t tsn)
 {
-	zdo_tsn_ctx_t * p_tsn_ctx = get_ctx_by_tsn(tsn);
+	zdo_tsn_ctx_t *p_tsn_ctx = get_ctx_by_tsn(tsn);
 
 	if (!p_tsn_ctx) {
 		return;
@@ -261,7 +261,7 @@ static void cmd_zb_match_desc_cb(zb_bufid_t bufid)
 
 	if (p_tsn_ctx) {
 		if (p_resp->status == ZB_ZDP_STATUS_SUCCESS) {
-			zb_uint8_t * p_match_ep = (zb_uint8_t *)(p_resp + 1);
+			zb_uint8_t *p_match_ep = (zb_uint8_t *)(p_resp + 1);
 
 			shell_print(p_tsn_ctx->shell, "");
 			while (p_resp->match_len > 0) {
@@ -389,8 +389,8 @@ static void cmd_zb_bind_unbind_timeout(zb_uint8_t tsn)
  */
 zb_void_t cmd_zb_bind_unbind_cb(zb_bufid_t bufid)
 {
-	zb_zdo_bind_resp_t * p_resp = (zb_zdo_bind_resp_t *)zb_buf_begin(bufid);
-	zdo_tsn_ctx_t      * p_tsn_ctx;
+	zb_zdo_bind_resp_t   *p_resp = (zb_zdo_bind_resp_t *)zb_buf_begin(bufid);
+	zdo_tsn_ctx_t        *p_tsn_ctx;
 	zb_ret_t             zb_err_code;
 
 	p_tsn_ctx = get_ctx_by_tsn(p_resp->tsn);
@@ -424,7 +424,7 @@ zb_void_t cmd_zb_bind_unbind_cb(zb_bufid_t bufid)
  */
 static void cmd_zb_nwk_addr_timeout(zb_uint8_t tsn)
 {
-	zdo_tsn_ctx_t * p_tsn_ctx = get_ctx_by_tsn(tsn);
+	zdo_tsn_ctx_t *p_tsn_ctx = get_ctx_by_tsn(tsn);
 
 	if (!p_tsn_ctx) {
 		return;
@@ -481,7 +481,7 @@ zb_void_t cmd_zb_nwk_addr_cb(zb_bufid_t bufid)
  */
 static void cmd_zb_ieee_addr_timeout(zb_uint8_t tsn)
 {
-	zdo_tsn_ctx_t * p_tsn_ctx = get_ctx_by_tsn(tsn);
+	zdo_tsn_ctx_t *p_tsn_ctx = get_ctx_by_tsn(tsn);
 
 	if (p_tsn_ctx) {
 		print_error(p_tsn_ctx->shell, "IEEE address request timed out",
@@ -724,10 +724,10 @@ error:
 static int cmd_zb_match_desc(const struct shell *shell, size_t argc,
 			     char **argv)
 {
-	zb_zdo_match_desc_param_t *p_req;
-	zdo_tsn_ctx_t             *p_tsn_cli;
+	zb_zdo_match_desc_param_t  *p_req;
+	zdo_tsn_ctx_t              *p_tsn_cli;
 	zb_bufid_t                 bufid;
-	u16_t                     *p_cluster_list = NULL;
+	u16_t                      *p_cluster_list = NULL;
 	u8_t                       len = sizeof(p_req->cluster_list);
 	zb_ret_t                   zb_err_code;
 	zb_bool_t                  use_timeout = ZB_FALSE;
@@ -923,8 +923,8 @@ error:
  */
 static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
 {
-	zb_zdo_bind_req_param_t * p_req;
-	zdo_tsn_ctx_t           * p_tsn_cli = NULL;
+	zb_zdo_bind_req_param_t   *p_req;
+	zdo_tsn_ctx_t             *p_tsn_cli = NULL;
 	zb_bufid_t                bufid;
 	zb_ret_t                  zb_err_code;
 	zb_bool_t                 bind;
@@ -1042,8 +1042,8 @@ error:
  */
 static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
 {
-	zb_zdo_nwk_addr_req_param_t * p_req;
-	zdo_tsn_ctx_t               * p_tsn_cli = NULL;
+	zb_zdo_nwk_addr_req_param_t   *p_req;
+	zdo_tsn_ctx_t                 *p_tsn_cli = NULL;
 	zb_bufid_t                    bufid;
 	zb_ret_t                      zb_err_code;
 	int                           ret_err = 0;
@@ -1114,8 +1114,8 @@ error:
  */
 static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
 {
-	zb_zdo_ieee_addr_req_param_t * p_req = NULL;
-	zdo_tsn_ctx_t                * p_tsn_cli = NULL;
+	zb_zdo_ieee_addr_req_param_t   *p_req = NULL;
+	zdo_tsn_ctx_t                  *p_tsn_cli = NULL;
 	zb_bufid_t                     bufid;
 	zb_ret_t                       zb_err_code;
 	zb_uint16_t                    addr;
@@ -1250,7 +1250,7 @@ static int cmd_zb_eui64(const struct shell *shell, size_t argc, char **argv)
  */
 static void cmd_zb_mgmt_leave_timeout_cb(zb_uint8_t tsn)
 {
-	zdo_tsn_ctx_t * p_tsn_ctx = get_ctx_by_tsn(tsn);
+	zdo_tsn_ctx_t *p_tsn_ctx = get_ctx_by_tsn(tsn);
 
 	if (p_tsn_ctx == NULL) {
 		return;
@@ -1318,7 +1318,8 @@ static bool cmd_zb_mgmt_leave_parse(zb_zdo_mgmt_leave_param_t *p_req,
 
 	ZB_MEMSET(p_req, 0, sizeof(*p_req));
 
-	arg_idx = 1U;   /* Let it be index of the first argument to parse. */
+	/* Let it be index of the first argument to parse. */
+	arg_idx = 1U;
 	if (arg_idx >= argc) {
 		print_error(shell, "Lack of dst_addr parameter", ZB_FALSE);
 		return false;
@@ -1637,7 +1638,7 @@ static void print_bind_resp_records_header(const struct shell *shell)
  *       by p_resp parameter.
  */
 static void print_bind_resp(const struct shell *shell,
-			    const zb_zdo_mgmt_bind_resp_t * p_resp)
+			    const zb_zdo_mgmt_bind_resp_t *p_resp)
 {
 	u32_t next_start_index = ((u32_t)p_resp->start_index +
 				  p_resp->binding_table_list_count);
@@ -1754,11 +1755,11 @@ finish:
 static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
 {
 	size_t                     arg_idx = 1U;
-	zb_zdo_mgmt_bind_param_t * p_req;
+	zb_zdo_mgmt_bind_param_t   *p_req;
 	int                        ret_err = 0;
 
-	zdo_tsn_ctx_t * p_tsn_ctx = NULL;
-	zb_bufid_t      bufid     = 0;
+	zdo_tsn_ctx_t   *p_tsn_ctx = NULL;
+	zb_bufid_t      bufid      = 0;
 	zb_ret_t        zb_err_code;
 
 	p_tsn_ctx = get_free_ctx();
@@ -1855,7 +1856,7 @@ error:
  *
  * @param bufid     Reference to ZBOSS buffer (as required by Zigbee stack API)
  */
-static bool zdo_mgmt_lqi_cb(struct zdo_tsn_ctx * p_tsn_ctx, zb_bufid_t bufid)
+static bool zdo_mgmt_lqi_cb(struct zdo_tsn_ctx *p_tsn_ctx, zb_bufid_t bufid)
 {
 	bool                           result = true;
 	zb_zdo_mgmt_lqi_resp_t         *p_resp;
@@ -1895,7 +1896,7 @@ static bool zdo_mgmt_lqi_cb(struct zdo_tsn_ctx * p_tsn_ctx, zb_bufid_t bufid)
 		if ((next_index < p_resp->neighbor_table_entries) &&
 			(next_index < 0xff) &&
 			(p_resp->neighbor_table_list_count > 0)) {
-			zb_zdo_mgmt_lqi_param_t * p_req;
+			zb_zdo_mgmt_lqi_param_t *p_req;
 
 			(void)(zb_buf_reuse(bufid));
 			p_req = ZB_BUF_GET_PARAM(bufid,
@@ -1934,10 +1935,10 @@ static bool zdo_mgmt_lqi_cb(struct zdo_tsn_ctx * p_tsn_ctx, zb_bufid_t bufid)
  */
 static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
 {
-	zb_zdo_mgmt_lqi_param_t * p_req;
-	zb_bufid_t                bufid     = 0;
-	zdo_tsn_ctx_t           * p_tsn_cli = NULL;
-	int                       ret_err   = 0;
+	zb_zdo_mgmt_lqi_param_t   *p_req;
+	zb_bufid_t                bufid      = 0;
+	zdo_tsn_ctx_t             *p_tsn_cli = NULL;
+	int                       ret_err    = 0;
 	zb_ret_t                  zb_err_code;
 
 	bufid = zb_buf_get_out();

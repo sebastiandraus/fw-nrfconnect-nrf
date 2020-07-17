@@ -99,7 +99,7 @@ static zb_void_t invalidate_row_cb(zb_uint8_t row)
  *
  * @return Whether it is response or not.
  */
-static zb_bool_t is_response(zb_zcl_parsed_hdr_t * p_hdr, cmd_query_t * p_row)
+static zb_bool_t is_response(zb_zcl_parsed_hdr_t *p_hdr, cmd_query_t *p_row)
 {
 	zb_uint16_t remote_node_short = 0;
 	if (p_row->packet_info.dst_addr_mode ==
@@ -520,7 +520,7 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
  */
 static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
 {
-	zb_zcl_parsed_hdr_t * p_cmd_info = ZB_BUF_GET_PARAM(
+	zb_zcl_parsed_hdr_t *p_cmd_info = ZB_BUF_GET_PARAM(
 						bufid, zb_zcl_parsed_hdr_t);
 	zb_int8_t             row;
 	zb_ret_t              zb_err_code;
@@ -531,13 +531,13 @@ static zb_uint8_t cli_agent_ep_handler_generic_cmd(zb_bufid_t bufid)
 		return ZB_FALSE;
 	}
 
-	cmd_query_t * p_row = &(m_cmd_data[row]);
+	cmd_query_t *p_row = &(m_cmd_data[row]);
 	if (!is_response(p_cmd_info, p_row)) {
 		return ZB_FALSE;
 	}
 
 	if (p_cmd_info->cmd_id == ZB_ZCL_CMD_DEFAULT_RESP) {
-		zb_zcl_default_resp_payload_t * p_def_resp;
+		zb_zcl_default_resp_payload_t *p_def_resp;
 		p_def_resp = ZB_ZCL_READ_DEFAULT_RESP(bufid);
 
 		/* Print info received from default response. */

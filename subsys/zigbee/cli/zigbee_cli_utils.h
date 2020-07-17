@@ -66,15 +66,15 @@ static inline void print_error(const struct shell *shell, const char *p_message,
  * @param type          type of the list item
  * @param size          the list size (in items)
  */
-#define PRINT_LIST(text_buffer, hdr, fmt, type, ptr, size)                                               \
-{                                                                                                  \
-	sprintf((text_buffer + strlen(text_buffer)), hdr);                                                                 \
-	for (type * p_item = (ptr); p_item < (ptr) + size - 1; p_item++) {                         \
-		sprintf((text_buffer + strlen(text_buffer)), fmt ",", *p_item);                    \
-		}                                                                                  \
-	if (size > 0) {                                                                            \
-		sprintf((text_buffer + strlen(text_buffer)), fmt " ", *((ptr) + size - 1));        \
-	}                                                                                          \
+#define PRINT_LIST(text_buffer, hdr, fmt, type, ptr, size)                                  \
+{                                                                                           \
+	sprintf((text_buffer + strlen(text_buffer)), hdr);                                  \
+	for (type *p_item = (ptr); p_item < (ptr) + size - 1; p_item++) {                   \
+		sprintf((text_buffer + strlen(text_buffer)), fmt ",", *p_item);             \
+		}                                                                           \
+	if (size > 0) {                                                                     \
+		sprintf((text_buffer + strlen(text_buffer)), fmt " ", *((ptr) + size - 1)); \
+	}                                                                                   \
 }
 
 /**@brief Convert ZCL attribute value to string.
@@ -100,7 +100,7 @@ int zcl_attr_to_str(char *p_str_buf, u16_t buf_len, zb_uint16_t attr_type,
  *
  * @return 1 on success, 0 otherwise.
  */
-int sscan_uint8(const char * p_bp, u8_t * p_u8);
+int sscan_uint8(const char *p_bp, u8_t *p_u8);
 
 /**@brief Parse unsigned integers from input string.
  *
@@ -126,7 +126,7 @@ int sscan_uint(const char *p_bp, u8_t *p_value, u8_t size, u8_t base);
  * @param size      Data size in bytes
  * @param reverse   If True then data is printed out in reverse order.
  */
-void print_hexdump(const struct shell *shell, const u8_t * p_in, u8_t size,
+void print_hexdump(const struct shell *shell, const u8_t *p_in, u8_t size,
 		   bool reverse);
 
 /**@brief Print 64bit value (address, extpan) as hex string.
