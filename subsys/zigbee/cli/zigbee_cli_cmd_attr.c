@@ -264,12 +264,6 @@ static zb_void_t read_write_attr_send(zb_uint8_t param)
 	zb_uint8_t row = param;
 	attr_query_t *p_row = &(m_attr_table[row]);
 
-	/* ZCL sequence number is decreased because of previous
-	 * `ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A` called, in which when
-	 * ZCL seq nbr is taken, it is also increased.
-	 */
-	p_row->seq_num = (ZCL_CTX().seq_number - 1);
-
 	zb_err_code = ZB_SCHEDULE_APP_ALARM(invalidate_row_cb, row,
 					    ATTRIBUTE_ROW_TIMEOUT_S *
 					     ZB_TIME_ONE_SECOND);
@@ -378,6 +372,16 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	p_row->shell = shell;
 
 	zb_bufid_t bufid = zb_buf_get_out();
+	if (!bufid) {
+		print_error(shell,
+			    "Failed to execute command (buf alloc failed)",
+			    ZB_FALSE);
+		invalidate_row(row);
+		return -ENOEXEC;
+	}
+
+	/* Get the ZCL packet sequence number. */
+	p_row->seq_num = ZCL_CTX().seq_number;
 
 	ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction,
 					    ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
@@ -495,6 +499,16 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	p_row->shell = (const struct shell*)shell;
 
 	zb_bufid_t bufid = zb_buf_get_out();
+	if (!bufid) {
+		print_error(shell,
+			    "Failed to execute command (buf alloc failed)",
+			    ZB_FALSE);
+		invalidate_row(row);
+		return -ENOEXEC;
+	}
+
+	/* Get the ZCL packet sequence number. */
+	p_row->seq_num = ZCL_CTX().seq_number;
 
 	ZB_ZCL_GENERAL_INIT_WRITE_ATTR_REQ_A(bufid, p_cmd_buf, p_row->direction,
 					     ZB_ZCL_ENABLE_DEFAULT_RESPONSE);

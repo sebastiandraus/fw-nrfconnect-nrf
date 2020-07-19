@@ -301,8 +301,6 @@ static zb_void_t send_reporting_frame(zb_uint8_t param)
 	zb_uint8_t row = param;
 	tsn_ctx_t *p_row = &(m_tsn_ctx[row]);
 
-	p_row->tsn = ZCL_CTX().seq_number;
-
 	/* Send the actual frame. */
 	zb_err_code = zb_zcl_finish_and_send_packet_new(
 				p_row->packet_info.buffer,
@@ -454,6 +452,9 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 	/* Configure new tsn context. */
 	atomic_set(&(p_tsn_cli->taken), true);
 	p_tsn_cli->shell = shell;
+
+	/* Get the ZCL packet sequence number. */
+	p_tsn_cli->tsn = ZCL_CTX().seq_number;
 
 	/* Construct and send request. */
 	ZB_ZCL_GENERAL_INIT_CONFIGURE_REPORTING_SRV_REQ(
