@@ -155,6 +155,7 @@ static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
 		channel = zb_get_bdb_primary_channel_set();
 
 		switch (m_default_role) {
+#ifndef ZB_ED_ROLE
 		case ZB_NWK_DEVICE_TYPE_ROUTER:
 			zb_set_network_router_role(channel);
 			shell_print(shell, "Started router");
@@ -164,7 +165,11 @@ static int cmd_zb_start(const struct shell *shell, size_t argc, char **argv)
 			zb_set_network_coordinator_role(channel);
 			shell_print(shell, "Started coordinator");
 			break;
-
+#else
+		case ZB_NWK_DEVICE_TYPE_ED:
+			zb_set_network_ed_role(channel);
+			shell_print(shell, "Started End Device");
+#endif
 		default:
 			print_error(shell, "Role unsupported", ZB_FALSE);
 			return -ENOEXEC;
@@ -427,6 +432,7 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 			p_err_msg = "Failed to set IC";
 			goto exit;
 		}
+#ifndef ZB_ED_ROLE
 	} else if ((argc == 3) && (strcmp(argv[0], "add") == 0)) {
 		/* Check if stack is initialized as Install Code can not
 		 * be added until production config is initialised.
@@ -477,6 +483,7 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 			p_err_msg = "Syntax error";
 			goto exit;
 		}
+#endif
 	} else {
 		p_err_msg = "Syntax error";
 	}
@@ -609,6 +616,7 @@ static int cmd_zb_factory_reset(const struct shell *shell, size_t argc,
  * Done
  * @endcode
  */
+#ifndef ZB_ED_ROLE
 static int cmd_child_max(const struct shell *shell, size_t argc, char **argv)
 {
 	u32_t child_max = 0xFFFFFFFF;
@@ -634,6 +642,7 @@ static int cmd_child_max(const struct shell *shell, size_t argc, char **argv)
 	print_done(shell, ZB_FALSE);
 	return 0;
 }
+#endif
 
 zb_bool_t zb_cli_is_stack_started(void)
 {
@@ -647,13 +656,17 @@ zb_void_t zb_cli_set_stack_as_started(void)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_ic,
 	SHELL_CMD_ARG(add, NULL, IC_ADD_HELP, cmd_zb_install_code, 3, 0),
+#ifndef ZB_ED_ROLE
 	SHELL_CMD_ARG(policy, NULL, IC_POLICY_HELP, cmd_zb_install_code, 2, 0),
 	SHELL_CMD_ARG(set, NULL, IC_SET_POLICY, cmd_zb_install_code, 2, 0),
+#endif
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_bdb,
 	SHELL_CMD_ARG(channel, NULL, CHANNEL_HELP, cmd_zb_channel, 1, 1),
+#ifndef ZB_ED_ROLE
 	SHELL_CMD_ARG(child_max, NULL, CHILD_MAX_HELP, cmd_child_max, 2, 0),
+#endif
 	SHELL_CMD_ARG(extpanid, NULL, EXTPANID_HELP, cmd_zb_extpanid, 1, 1),
 	SHELL_CMD_ARG(factory_reset, NULL, "Perform factory reset.",
 				  cmd_zb_factory_reset, 1, 0),
