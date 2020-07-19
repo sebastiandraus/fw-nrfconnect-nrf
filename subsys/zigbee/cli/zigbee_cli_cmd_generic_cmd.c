@@ -151,8 +151,6 @@ static zb_void_t zcl_cmd_send(zb_uint8_t param)
 	zb_ret_t    zb_err_code;
 	cmd_query_t *p_cmd_query = &m_cmd_data[param];
 
-	p_cmd_query->seq_num = ZCL_CTX().seq_number;
-
 	/* Send the actual frame. */
 	zb_err_code = zb_zcl_finish_and_send_packet_new(
 				p_cmd_query->packet_info.buffer,
@@ -325,6 +323,9 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 		return -ENOEXEC;
 	}
 
+	/* Get the ZCL packet sequence number. */
+	p_cmd_data->seq_num = ZCL_CTX().seq_number;
+
 	/* Start filling buffer with packet data. */
 	zb_uint8_t* ptr = ZB_ZCL_START_PACKET_REQ(bufid)
 	ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL(
@@ -479,6 +480,9 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 		invalidate_row(table_row);
 		return -ENOEXEC;
 	}
+
+	/* Get the ZCL packet sequence number. */
+	p_cmd_data->seq_num = ZCL_CTX().seq_number;
 
 	/* Start filling buffer with packet data. */
 	zb_uint8_t *ptr = ZB_ZCL_START_PACKET(bufid);
