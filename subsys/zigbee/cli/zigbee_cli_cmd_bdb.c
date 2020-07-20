@@ -458,7 +458,6 @@ zb_void_t zb_install_code_add(zb_uint8_t param)
 	ic_add_ctx.taken = false;
 }
 
-
 /**@brief Set install code on the device, add information about the install code
  *  on the trust center, set the trust center install code policy.
  *
