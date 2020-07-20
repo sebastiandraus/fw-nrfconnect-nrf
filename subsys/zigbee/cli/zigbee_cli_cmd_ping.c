@@ -424,7 +424,11 @@ zb_void_t ping_request_send(ping_request_t *p_request)
 		return;
 	}
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		if (p_request->p_cb) {
 			p_request->p_cb(PING_EVT_ERROR, 0, p_request);
@@ -478,7 +482,12 @@ zb_void_t ping_request_send(ping_request_t *p_request)
 		print_error(p_request->shell,
 				"Can not schedule zcl frame.",
 				ZB_FALSE);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(p_request->packet_info.buffer);
+		zb_osif_enable_all_inter();
+
 		zb_ping_release_request(p_request);
 		return;
 	}
@@ -495,7 +504,11 @@ static zb_void_t ping_reply_send(ping_reply_t *p_reply)
 	zb_uint8_t   cli_ep = zb_get_cli_endpoint();
 	zb_ret_t     zb_err_code;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		LOG_WRN("Drop ping request due to the lack of output buffers");
 		ping_release_reply(p_reply);
@@ -531,7 +544,12 @@ static zb_void_t ping_reply_send(ping_reply_t *p_reply)
 		print_error(p_reply->shell,
 				"Can not schedule zcl frame.",
 				ZB_FALSE);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(p_reply->packet_info.buffer);
+		zb_osif_enable_all_inter();
+
 		ping_release_reply(p_reply);
 	}
 }

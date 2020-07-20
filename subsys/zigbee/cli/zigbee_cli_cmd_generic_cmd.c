@@ -314,8 +314,11 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	/* Set shell to print logs to. */
 	p_cmd_data->shell = shell;
 
-	/* Get buffer and prepare command. */
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_bufid_t bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(p_cmd_data->shell, "Can not get buffer.", ZB_FALSE);
 		/* Mark data structure as free. */
@@ -352,7 +355,12 @@ int cmd_zb_generic_cmd(const struct shell *shell, size_t argc, char **argv)
 	if (zb_err_code != RET_OK) {
 		print_error(p_cmd_data->shell, "Can not schedule ZCL frame",
 			    ZB_FALSE);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(p_cmd_data->packet_info.buffer);
+		zb_osif_enable_all_inter();
+
 		invalidate_row(table_row);
 		return -ENOEXEC;
 	}
@@ -472,8 +480,11 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	/* Set shell to print logs to. */
 	p_cmd_data->shell = shell;
 
-	/* Get buffer and prepare command. */
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_bufid_t bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(p_cmd_data->shell, "Can not get buffer.", ZB_FALSE);
 		/* Mark data structure as free. */
@@ -506,7 +517,12 @@ int cmd_zb_zcl_raw(const struct shell *shell, size_t argc, char **argv)
 	if (zb_err_code != RET_OK) {
 		print_error(p_cmd_data->shell, "Can not schedule ZCL frame",
 			    ZB_FALSE);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(p_cmd_data->packet_info.buffer);
+		zb_osif_enable_all_inter();
+
 		invalidate_row(table_row);
 		return -ENOEXEC;
 	}

@@ -371,7 +371,11 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 	/* Put the shell instance to be used later. */
 	p_row->shell = shell;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_bufid_t bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell,
 			    "Failed to execute command (buf alloc failed)",
@@ -403,7 +407,12 @@ int cmd_zb_readattr(const struct shell *shell, size_t argc, char **argv)
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
 		/* Invalidate row so that we can reuse it. */
 		invalidate_row(row);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 	return 0;
@@ -498,7 +507,11 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 	/* Put the shell instance to be used later. */
 	p_row->shell = (const struct shell*)shell;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_bufid_t bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell,
 			    "Failed to execute command (buf alloc failed)",
@@ -532,7 +545,12 @@ int cmd_zb_writeattr(const struct shell *shell, size_t argc, char **argv)
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
 		/* Invalidate row so that we can reuse it. */
 		invalidate_row(row);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 	return 0;
