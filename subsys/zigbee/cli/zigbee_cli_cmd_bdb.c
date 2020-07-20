@@ -54,9 +54,17 @@
 	("Set/get role.\n" \
 	"Usage: role [<role>]")
 
+typedef struct {
+	atomic_t           taken;
+	const struct shell *shell;
+	zb_ieee_addr_t     addr;
+	zb_uint8_t         ic[ZB_CCM_KEY_SIZE + 2];
+} ic_cmd_ctx_t;
+
 static zb_nwk_device_type_t m_default_role      = ZB_NWK_DEVICE_TYPE_ROUTER;
 static atomic_t             m_stack_is_started  = ATOMIC_INIT(ZB_FALSE);
 static zb_bool_t            m_legacy_mode       = ZB_FALSE;
+static ic_cmd_ctx_t         m_ic_add_ctx        = {0};
 
 /**@brief Set or get Zigbee role of the device.
  *
@@ -369,6 +377,23 @@ static int cmd_zb_channel(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
+/**@brief Function adding install code, to be executed in Zigbee thread context.
+ *
+ * @param[in] param Unused param.
+ */
+zb_void_t install_code_add(zb_uint8_t param)
+{
+	(void)(param);
+
+	if (zb_secur_ic_add(m_ic_add_ctx.addr, ZB_IC_TYPE_128, m_ic_add_ctx.ic)
+	    != RET_OK) {
+		print_error(m_ic_add_ctx.shell, "Failed to add IC", ZB_FALSE);
+	} else {
+		print_done(m_ic_add_ctx.shell, ZB_FALSE);
+	}
+	atomic_set(&m_ic_add_ctx.taken, ZB_FALSE);
+}
+
 
 /**@brief Set install code on the device, add information about the install code
  *  on the trust center, set the trust center install code policy.
@@ -406,7 +431,6 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 			       char **argv)
 {
 	const char     *p_err_msg = NULL;
-	zb_ieee_addr_t addr;
 	/* +2 for CRC16. */
 	zb_uint8_t     ic[ZB_CCM_KEY_SIZE + 2];
 
@@ -448,21 +472,33 @@ static int cmd_zb_install_code(const struct shell *shell, size_t argc,
 			return -ENOEXEC;
 		}
 
-		if (!parse_hex_str(argv[1], strlen(argv[1]), ic, sizeof(ic),
-				   false)) {
+		if (atomic_get(&m_ic_add_ctx.taken) == ZB_TRUE) {
+			p_err_msg = "Can not get ctx to store install code";
+			goto exit;
+		}
+
+		atomic_set(&m_ic_add_ctx.taken, ZB_TRUE);
+
+		if (!parse_hex_str(argv[1], strlen(argv[1]), m_ic_add_ctx.ic,
+				   sizeof(m_ic_add_ctx.ic), false)) {
 			p_err_msg = "Failed to parse IC";
+			atomic_set(&m_ic_add_ctx.taken, ZB_FALSE);
 			goto exit;
 		}
 
-		if (!parse_long_address(argv[2], addr)) {
+		if (!parse_long_address(argv[2], m_ic_add_ctx.addr)) {
 			p_err_msg = "Failed to parse eui64";
+			atomic_set(&m_ic_add_ctx.taken, ZB_FALSE);
 			goto exit;
 		}
 
-		if (zb_secur_ic_add(addr, ZB_IC_TYPE_128, ic) != RET_OK) {
-			p_err_msg = "Failed to add IC";
+		if (ZB_SCHEDULE_APP_CALLBACK(install_code_add, 0) != RET_OK) {
+			p_err_msg = "Can not add install code";
+			atomic_set(&m_ic_add_ctx.taken, ZB_FALSE);
 			goto exit;
 		}
+		return 0;
+
 	} else if ((argc == 2) && (strcmp(argv[0], "policy") == 0)) {
 		if (zb_get_network_role() != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
 			print_error(shell, "Device must be a coordinator",
