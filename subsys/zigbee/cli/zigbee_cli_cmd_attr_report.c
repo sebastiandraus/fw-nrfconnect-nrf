@@ -440,7 +440,11 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell,
 			    "Failed to execute command (buf alloc failed)",
@@ -480,7 +484,12 @@ int cmd_zb_subscribe(const struct shell *shell, size_t argc, char **argv)
 		print_error(shell, "No frame left - wait a bit", ZB_FALSE);
 		/* Invalidate ctx so that we can reuse it. */
 		invalidate_ctx(p_tsn_cli);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 

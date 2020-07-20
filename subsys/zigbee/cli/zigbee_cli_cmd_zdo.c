@@ -569,7 +569,11 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
 	u16_t                       addr;
 	zb_ret_t                    zb_err_code;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -587,7 +591,12 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
 	p_tsn_cli = get_free_ctx();
 	if (!p_tsn_cli) {
 		print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 
@@ -604,14 +613,23 @@ static int cmd_zb_active_ep(const struct shell *shell, size_t argc, char **argv)
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
 		invalidate_ctx(p_tsn_cli);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 
 	return 0;
 
 error:
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_buf_free(bufid);
+	zb_osif_enable_all_inter();
+
 	return -EINVAL;
 }
 
@@ -642,7 +660,11 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc,
 	zb_uint16_t               addr;
 	zb_ret_t                  zb_err_code;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -665,7 +687,12 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc,
 	p_tsn_cli = get_free_ctx();
 	if (!p_tsn_cli) {
 		print_error(shell, "Too many ZDO transactions", ZB_FALSE);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 
@@ -682,14 +709,23 @@ static int cmd_zb_simple_desc(const struct shell *shell, size_t argc,
 	if (zb_err_code != RET_OK) {
 		print_error(shell, "Unable to schedule zdo request", ZB_FALSE);
 		invalidate_ctx(p_tsn_cli);
+
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -ENOEXEC;
 	}
 
 	return 0;
 
 error:
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_buf_free(bufid);
+	zb_osif_enable_all_inter();
+
 	return -EINVAL;
 }
 
@@ -747,7 +783,11 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc,
 		return -EINVAL;
 	}
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -896,7 +936,11 @@ static int cmd_zb_match_desc(const struct shell *shell, size_t argc,
 	return ret_err;
 
 error:
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_buf_free(bufid);
+	zb_osif_enable_all_inter();
+
 	return ret_err;
 }
 
@@ -936,7 +980,11 @@ static int cmd_zb_bind(const struct shell *shell, size_t argc, char **argv)
 		bind = ZB_FALSE;
 	}
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -1023,7 +1071,10 @@ error:
 	if (p_tsn_cli != NULL) {
 		invalidate_ctx(p_tsn_cli);
 	}
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_buf_free(bufid);
+	zb_osif_enable_all_inter();
 
 	return ret_err;
 }
@@ -1048,7 +1099,11 @@ static int cmd_zb_nwk_addr(const struct shell *shell, size_t argc, char **argv)
 	zb_ret_t                      zb_err_code;
 	int                           ret_err = 0;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -1100,7 +1155,10 @@ error:
 	if (p_tsn_cli != NULL) {
 		invalidate_ctx(p_tsn_cli);
 	}
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_buf_free(bufid);
+	zb_osif_enable_all_inter();
 
 	return ret_err;
 }
@@ -1121,7 +1179,11 @@ static int cmd_zb_ieee_addr(const struct shell *shell, size_t argc, char **argv)
 	zb_uint16_t                    addr;
 	int                            ret_err = 0;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -1170,7 +1232,10 @@ error:
 	if (p_tsn_cli != NULL) {
 		invalidate_ctx(p_tsn_cli);
 	}
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	zb_buf_free(bufid);
+	zb_osif_enable_all_inter();
 
 	return ret_err;
 }
@@ -1421,7 +1486,11 @@ static int cmd_zb_mgmt_leave(const struct shell *shell, size_t argc,
 	zdo_tsn_ctx_t *p_tsn_cli = NULL;
 	zb_ret_t       zb_err_code;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (bufid == 0) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -1433,7 +1502,11 @@ static int cmd_zb_mgmt_leave(const struct shell *shell, size_t argc,
 		/* The error message has already been printed
 		 * by cmd_zb_mgmt_leave_parse.
 		 */
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
+
 		return -EINVAL;
 	}
 
@@ -1462,7 +1535,10 @@ static int cmd_zb_mgmt_leave(const struct shell *shell, size_t argc,
 
 error:
 	if (bufid != 0) {
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
 	}
 	if (p_tsn_cli != NULL) {
 		invalidate_ctx(p_tsn_cli);
@@ -1805,7 +1881,11 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
 		goto error;
 	}
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to execute command (buf alloc failed)",
 			    ZB_FALSE);
@@ -1838,7 +1918,10 @@ static int cmd_zb_mgmt_bind(const struct shell *shell, size_t argc, char **argv)
 
 error:
 	if (bufid != 0) {
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
 	}
 	if (p_tsn_ctx != NULL) {
 		invalidate_ctx(p_tsn_ctx);
@@ -1898,7 +1981,11 @@ static bool zdo_mgmt_lqi_cb(struct zdo_tsn_ctx *p_tsn_ctx, zb_bufid_t bufid)
 			(p_resp->neighbor_table_list_count > 0)) {
 			zb_zdo_mgmt_lqi_param_t *p_req;
 
+			/* Make sure ZBOSS buffer API is called safely. */
+			zb_osif_disable_all_inter();
 			(void)(zb_buf_reuse(bufid));
+			zb_osif_enable_all_inter();
+
 			p_req = ZB_BUF_GET_PARAM(bufid,
 						 zb_zdo_mgmt_lqi_param_t);
 
@@ -1941,7 +2028,11 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
 	int                       ret_err    = 0;
 	zb_ret_t                  zb_err_code;
 
+	/* Make sure ZBOSS buffer API is called safely. */
+	zb_osif_disable_all_inter();
 	bufid = zb_buf_get_out();
+	zb_osif_enable_all_inter();
+
 	if (!bufid) {
 		print_error(shell, "Failed to allocate request buffer",
 			    ZB_FALSE);
@@ -1997,7 +2088,10 @@ static int cmd_zb_mgmt_lqi(const struct shell *shell, size_t argc, char **argv)
 
 error:
 	if (bufid != 0) {
+		/* Make sure ZBOSS buffer API is called safely. */
+		zb_osif_disable_all_inter();
 		zb_buf_free(bufid);
+		zb_osif_enable_all_inter();
 	}
 	if (p_tsn_cli != NULL) {
 		invalidate_ctx(p_tsn_cli);
