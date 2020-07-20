@@ -19,25 +19,6 @@
  */
 void zb_set_cli_default_shell_prompt(const char *new_prompt);
 
-/**@brief Mark current shell command as processed by giving semaphore.
- */
-void zb_cmd_processed(void);
-
-/**@brief Blocks processing current shell command handler until all requested
- *        actions are finished, for example when getting data from other devices
- *        over Zigbee. Call `zb_cmd_processed()` when requested actions
- *        are finished.
- *
- * @param[in] timeout Specifies time to wait for requested actions
- *                    to be finished.
- */
-void zb_cmd_wait_until_processed(k_timeout_t timeout);
-
-/**@brief Resets internal semaphore used to block processing shell
- *        command handlers. Call at the beginning of command handler to make
- *        sure that processing can be block properly.
- */
-void zb_cmd_sem_reset(void);
 
 /**@brief Returns the Endpoint number used by the CLI.
  */

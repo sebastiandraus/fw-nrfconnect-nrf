@@ -21,9 +21,6 @@ static zb_uint8_t cli_ep = ZB_MAX_ENDPOINT_NUMBER;
 /* Zigbee cli debug mode indicator. */
 static zb_bool_t m_debug_mode = ZB_FALSE;
 
-/* Semaphore used to block shell command handler processing. */
-static K_SEM_DEFINE(zb_cmd_processed_sem, 0, 1);
-
 LOG_MODULE_REGISTER(cli, CONFIG_ZIGBEE_CLI_LOG_LEVEL);
 
 
@@ -59,35 +56,6 @@ void zb_set_cli_default_shell_prompt(const char *new_prompt)
 		LOG_ERR("Can not change shell prompt");
 	}
 #endif
-}
-
-/**@brief Mark current shell command as processed by giving semaphore.
- */
-void zb_cmd_processed(void)
-{
-	k_sem_give(&zb_cmd_processed_sem);
-}
-
-/**@brief Blocks processing current shell command handler until all requested
- *        actions are finished, for example when getting data from other devices
- *        over Zigbee. Call `zb_cmd_processed()` when requested actions
- *        are finished.
- *
- * @param[in] timeout Specifies time to wait for requested actions
- *                    to be finished.
- */
-void zb_cmd_wait_until_processed(k_timeout_t timeout)
-{
-	k_sem_take(&zb_cmd_processed_sem, timeout);
-}
-
-/**@brief Resets internal semaphore used to block processing shell
- *        command handlers. Call at the beginning of command handler to make
- *        sure that processing can be block properly.
- */
-void zb_cmd_sem_reset(void)
-{
-	k_sem_reset(&zb_cmd_processed_sem);
 }
 
 /**@brief Returns the Endpoint number used by the CLI.
