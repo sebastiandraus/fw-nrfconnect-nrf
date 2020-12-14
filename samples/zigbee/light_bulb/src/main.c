@@ -24,6 +24,24 @@
 #include <zb_error_handler.h>
 #include <zb_nrf_platform.h>
 
+#if CONFIG_BT_NUS
+#include "nus_cmd.h"
+
+/* LED which indicates that Central is connected. */
+#define NUS_STATUS_LED            DK_LED2
+/* UART command that will turn on found light bulb(s). */
+#define COMMAND_ON                "n"
+/**< UART command that will turn off found light bulb(s). */
+#define COMMAND_OFF               "f"
+/**< UART command that will turn toggle found light bulb(s). */
+#define COMMAND_TOGGLE            "t"
+/**< UART command that will increase brightness of found light bulb(s). */
+#define COMMAND_INCREASE          "i"
+/**< UART command that will decrease brightness of found light bulb(s). */
+#define COMMAND_DECREASE          "d"
+#endif /* CONFIG_BT_NUS */
+
+
 #define RUN_STATUS_LED                  DK_LED1
 #define RUN_LED_BLINK_INTERVAL          1000
 
@@ -497,6 +515,61 @@ void error(void)
 	}
 }
 
+#if CONFIG_BT_NUS
+
+static void turn_on_cmd(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	LOG_INF("NUS: Turn ON command");
+}
+
+static void turn_off_cmd(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	LOG_INF("NUS: Turn OFF command");
+}
+
+static void toggle_cmd(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	LOG_INF("NUS: TOGGLE command");
+}
+
+static void increase_cmd(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	LOG_INF("NUS: INCREASE command");
+}
+
+static void decrease_cmd(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	LOG_INF("NUS: DECREASE command");
+}
+
+static void on_nus_connect(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	dk_set_led_on(NUS_STATUS_LED);
+}
+
+static void on_nus_disconnect(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	dk_set_led_off(NUS_STATUS_LED);
+}
+
+static struct nus_entry commands[] = {
+	NUS_COMMAND(COMMAND_ON, turn_on_cmd),
+	NUS_COMMAND(COMMAND_OFF, turn_off_cmd),
+	NUS_COMMAND(COMMAND_TOGGLE, toggle_cmd),
+	NUS_COMMAND(COMMAND_INCREASE, increase_cmd),
+	NUS_COMMAND(COMMAND_DECREASE, decrease_cmd),
+	NUS_COMMAND(NULL, NULL),
+};
+
+#endif /* CONFIG_BT_NUS */
+
 void main(void)
 {
 	int blink_status = 0;
@@ -517,6 +590,11 @@ void main(void)
 
 	/* Start Zigbee default thread */
 	zigbee_enable();
+
+#if CONFIG_BT_NUS
+	/* Initalize NUS command service. */
+	nus_cmd_init(on_nus_connect, on_nus_disconnect, commands);
+#endif /* CONFIG_BT_NUS */
 
 	LOG_INF("ZBOSS Light Bulb example started");
 
