@@ -37,6 +37,8 @@ manifest:
       url-base: https://github.com/PelionIoT
     - name: memfault
       url-base: https://github.com/memfault
+    - name: sedr
+      url-base: https://github.com/sebastiandraus
 
   # If not otherwise specified, the projects below should be obtained
   # from the ncs remote.
@@ -103,7 +105,8 @@ manifest:
     - name: nrfxlib
       repo-path: sdk-nrfxlib
       path: nrfxlib
-      revision: d7795a15f59fed58f1e044a642fbae0786b51a4f
+      remote: sedr
+      revision: a2f161f4da60fb3f355f0ba0de7f4d3f99c9f79821d4970b0dee343692a9037b
     - name: trusted-firmware-m
       repo-path: sdk-trusted-firmware-m
       path: modules/tee/tfm
