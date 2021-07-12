@@ -10,7 +10,6 @@
 #include "zb_nrf_platform.h"
 #include <sys/ring_buffer.h>
 
-
 static K_SEM_DEFINE(tx_done_sem, 1, 1);
 static K_SEM_DEFINE(rx_done_sem, 1, 1);
 static const struct device *uart_dev;
@@ -21,8 +20,10 @@ static serial_recv_data_cb_t rx_data_cb;
 static serial_send_data_cb_t tx_data_cb;
 static serial_send_data_cb_t tx_trx_data_cb;
 
+#ifdef CONFIG_ZBOSS_TRACE_BINARY_NCP_TRANSPORT_LOGGING
 static uint8_t uart_tx_buf_mem[CONFIG_ZIGBEE_UART_TX_BUF_LEN];
 static size_t uart_tx_buf_size;
+#endif /* CONFIG_ZBOSS_TRACE_BINARY_NCP_TRANSPORT_LOGGING */
 
 static uint8_t *uart_tx_buf;
 static uint8_t *uart_tx_buf_bak;
@@ -42,6 +43,8 @@ static void uart_rx_timeout(struct k_timer *dummy);
 static K_TIMER_DEFINE(uart_tx_timer, uart_tx_timeout, NULL);
 static K_TIMER_DEFINE(uart_rx_timer, uart_rx_timeout, NULL);
 
+void zb_osif_serial_logger_init(void);
+void zb_osif_serial_logger_flush(void);
 
 /**
  * Inform user about received data and unlock for the next reception.
@@ -160,7 +163,7 @@ static void handle_rx_ready_evt(const struct device *dev)
 
 static void handle_tx_ready_evt(const struct device *dev)
 {
-	if (uart_tx_buf_len <= uart_tx_buf_offset) {
+	if ((uart_tx_buf_len <= uart_tx_buf_offset) || (uart_tx_buf == NULL)) {
 		uart_irq_tx_disable(dev);
 		return;
 	}
@@ -205,8 +208,7 @@ static void interrupt_handler(const struct device *dev, void *user_data)
 	}
 }
 
-
-void zb_osif_serial_init(void)
+void zb_osif_async_serial_init(void)
 {
 	if (uart_dev != NULL) {
 		return;
@@ -219,14 +221,20 @@ void zb_osif_serial_init(void)
 	rx_data_cb = NULL;
 	tx_data_cb = NULL;
 	tx_trx_data_cb = NULL;
-	uart_tx_buf = uart_tx_buf_mem;
-	uart_tx_buf_bak = uart_tx_buf_mem;
 	uart_tx_buf_len = 0;
 	uart_tx_buf_offset = 0;
-	uart_tx_buf_size = sizeof(uart_tx_buf_mem);
 	uart_rx_buf = NULL;
 	uart_rx_buf_len = 0;
 	uart_rx_buf_offset = 0;
+
+#ifdef CONFIG_ZBOSS_TRACE_BINARY_NCP_TRANSPORT_LOGGING
+	uart_tx_buf_size = sizeof(uart_tx_buf_mem);
+	uart_tx_buf = uart_tx_buf_mem;
+	uart_tx_buf_bak = uart_tx_buf_mem;
+#else
+	uart_tx_buf = NULL;
+	uart_tx_buf_bak = NULL;
+#endif /* CONFIG_ZBOSS_TRACE_BINARY_NCP_TRANSPORT_LOGGING */
 
 	uart_dev = device_get_binding(CONFIG_ZIGBEE_UART_DEVICE_NAME);
 	if (uart_dev == NULL) {
@@ -240,22 +248,7 @@ void zb_osif_serial_init(void)
 	uart_irq_rx_enable(uart_dev);
 }
 
-void zb_osif_set_uart_byte_received_cb(zb_callback_t hnd)
-{
-	char_handler = hnd;
-}
-
-void zb_osif_set_user_io_buffer(zb_byte_array_t *buf_ptr, zb_ushort_t capacity)
-{
-	(void)k_sem_take(&tx_done_sem, K_FOREVER);
-
-	uart_tx_buf = buf_ptr->ring_buf;
-	uart_tx_buf_size = capacity;
-
-	k_sem_give(&tx_done_sem);
-}
-
-void zb_osif_uart_sleep(void)
+void zb_osif_async_serial_sleep(void)
 {
 	if (uart_dev == NULL) {
 		return;
@@ -266,7 +259,7 @@ void zb_osif_uart_sleep(void)
 	uart_irq_rx_disable(uart_dev);
 }
 
-void zb_osif_uart_wake_up(void)
+void zb_osif_async_serial_wake_up(void)
 {
 	if (uart_dev == NULL) {
 		return;
@@ -276,35 +269,6 @@ void zb_osif_uart_wake_up(void)
 
 	/* Enable rx interrupts. */
 	uart_irq_rx_enable(uart_dev);
-}
-
-void zb_osif_serial_put_bytes(const zb_uint8_t *buf, zb_short_t len)
-{
-#if !(defined(ZB_HAVE_ASYNC_SERIAL) && \
-	defined(CONFIG_ZBOSS_TRACE_LOG_LEVEL_OFF))
-
-	if ((uart_dev == NULL) || is_sleeping) {
-		return;
-	}
-
-	if (len > uart_tx_buf_size) {
-		return;
-	}
-
-	/*
-	 * Wait forever since there is no way to inform higher layer
-	 * about TX busy state.
-	 */
-	(void)k_sem_take(&tx_done_sem, K_FOREVER);
-	memcpy(uart_tx_buf, buf, len);
-
-	uart_tx_buf_len = len;
-	uart_tx_buf_offset = 0;
-
-	/* Enable tx interrupts. */
-	uart_irq_tx_enable(uart_dev);
-
-#endif /* !(ZB_HAVE_ASYNC_SERIAL && CONFIG_ZBOSS_TRACE_LOG_LEVEL_OFF) */
 }
 
 void zb_osif_serial_recv_data(zb_uint8_t *buf, zb_ushort_t len)
@@ -391,8 +355,82 @@ void zb_osif_serial_set_cb_send_data(serial_send_data_cb_t cb)
 	tx_data_cb = cb;
 }
 
-void zb_osif_serial_flush(void)
+void zb_osif_async_serial_flush(void)
 {
 	(void)k_sem_take(&tx_done_sem, K_FOREVER);
 	k_sem_give(&tx_done_sem);
+}
+
+#ifdef CONFIG_ZBOSS_TRACE_BINARY_NCP_TRANSPORT_LOGGING
+void zb_osif_set_uart_byte_received_cb(zb_callback_t hnd)
+{
+	char_handler = hnd;
+}
+
+void zb_osif_set_user_io_buffer(zb_byte_array_t *buf_ptr, zb_ushort_t capacity)
+{
+	(void)k_sem_take(&tx_done_sem, K_FOREVER);
+
+	uart_tx_buf = buf_ptr->ring_buf;
+	uart_tx_buf_size = capacity;
+
+	k_sem_give(&tx_done_sem);
+}
+
+void zb_osif_serial_put_bytes(const zb_uint8_t *buf, zb_short_t len)
+{
+#if !(defined(ZB_HAVE_ASYNC_SERIAL) && \
+	defined(CONFIG_ZBOSS_TRACE_LOG_LEVEL_OFF))
+
+	if ((uart_dev == NULL) || is_sleeping) {
+		return;
+	}
+
+	if (len > uart_tx_buf_size) {
+		return;
+	}
+
+	/*
+	 * Wait forever since there is no way to inform higher layer
+	 * about TX busy state.
+	 */
+	(void)k_sem_take(&tx_done_sem, K_FOREVER);
+	memcpy(uart_tx_buf, buf, len);
+
+	uart_tx_buf_len = len;
+	uart_tx_buf_offset = 0;
+
+	/* Enable tx interrupts. */
+	uart_irq_tx_enable(uart_dev);
+
+#endif /* !(ZB_HAVE_ASYNC_SERIAL && CONFIG_ZBOSS_TRACE_LOG_LEVEL_OFF) */
+}
+#endif /* CONFIG_ZBOSS_TRACE_BINARY_NCP_TRANSPORT_LOGGING */
+
+void zb_osif_serial_init(void)
+{
+	zb_osif_async_serial_init();
+
+	if (IS_ENABLED(CONFIG_ZBOSS_TRACE_BINARY_LOGGING)) {
+		zb_osif_serial_logger_init();
+	}
+}
+
+void zb_osif_uart_sleep(void)
+{
+	zb_osif_async_serial_sleep();
+}
+
+void zb_osif_uart_wake_up(void)
+{
+	zb_osif_async_serial_wake_up();
+}
+
+void zb_osif_serial_flush(void)
+{
+	zb_osif_async_serial_flush();
+
+	if (IS_ENABLED(CONFIG_ZBOSS_TRACE_BINARY_LOGGING)) {
+		zb_osif_serial_logger_flush();
+	}
 }
