@@ -11,6 +11,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(app)
 add_definitions(-Wno-packed-bitfield-compat)
 
+zephyr_compile_definitions(CONFIG_ZBOSS_TRACE_LOGGER_BUFFER_SIZE=1024)
+
 zephyr_include_directories(${NRFXLIB_DIR}/zboss/include)
 zephyr_include_directories(${NRFXLIB_DIR}/zboss/include/osif)
 target_include_directories(app BEFORE PRIVATE mock)
